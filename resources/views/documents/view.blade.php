@@ -104,29 +104,27 @@
         <div class="col-xl-3 col-lg-4">
             
             <!-- CREATOR INFO -->
-            <div class="card shadow-sm border-0 rounded-3 mb-3">
-                <div class="card-header bg-maroon text-white py-2">
-                    <h6 class="mb-0 small fw-bold text-uppercase">Creator Details</h6>
-                </div>
-                <div class="card-body p-3">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="bg-maroon bg-opacity-10 text-maroon rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
-                            <i class="fa fa-user-tie"></i>
-                        </div>
-                        <div class="ms-3">
-                            <h6 class="mb-0 fw-bold">{{ $document->uploader->username }}</h6>
-                            <small class="text-muted">Office Head / Staff</small>
-                        </div>
-                    </div>
-                    <div class="small border-top pt-2">
-                        <div class="mb-1 text-muted">Office: <span class="fw-bold text-maroon text-uppercase">{{ $document->uploader->office->office_name ?? 'Records' }}</span></div>
-                        <div class="text-muted">Campus Code: <span class="fw-bold text-dark">{{ $document->uploader->campus_code ?? '0001' }}</span></div>
-                    </div>
-                    <button class="btn btn-dark btn-sm w-100 mt-3 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#trailModal">
-                        <i class="fa fa-history me-1"></i> VIEW AUDIT TRAIL
-                    </button>
-                </div>
-            </div>
+<div class="card shadow-sm border-0 rounded-3 mb-3">
+    <div class="card-header bg-maroon text-white py-2">
+        <h6 class="mb-0 small fw-bold text-uppercase">Creator Details</h6>
+    </div>
+    <div class="card-body p-3">
+        <!-- Removed the square div and alignment classes -->
+        <div class="mb-3">
+            <h6 class="mb-0 fw-bold text-dark" style="font-size: 1.1rem;">{{ $document->uploader->username }}</h6>
+            <small class="text-muted">Office Head / Staff</small>
+        </div>
+
+        <div class="small border-top pt-2">
+            <div class="mb-1 text-muted">Office: <span class="fw-bold text-maroon text-uppercase">{{ $document->uploader->office->office_name ?? 'Records' }}</span></div>
+            <div class="text-muted">Campus Code: <span class="fw-bold text-dark">{{ $document->uploader->campus_code ?? '0001' }}</span></div>
+        </div>
+        
+        <button class="btn btn-dark btn-sm w-100 mt-3 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#trailModal">
+            <i class="fa fa-history me-1"></i> VIEW AUDIT TRAIL
+        </button>
+    </div>
+</div>
 
             <!-- JOURNEY STATUS (FIXED) -->
             <div class="card shadow-sm border-0 rounded-3">
