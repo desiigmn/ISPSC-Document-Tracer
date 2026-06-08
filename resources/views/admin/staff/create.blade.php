@@ -7,7 +7,7 @@
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card shadow-sm border-0 rounded-3">
-                <div class="card-header bg-maroon text-white py-3">
+                <div class="card-header bg-dark text-white py-3">
                     <h5 class="mb-0 fw-bold"><i class="fa fa-user-plus me-2"></i> CREATE STAFF ACCOUNT</h5>
                 </div>
                 <div class="card-body p-4">
