@@ -15,11 +15,11 @@
     .main-content-fluid {
         width: 100%;
         max-width: 100%;
-        padding: 0 40px; /* Extra breathing room on edges */
+        padding: 0 40px; 
     }
 
     .stat-card {
-        min-height: 160px; /* Made cards taller */
+        min-height: 160px; 
         border: none;
         border-radius: 15px;
         transition: transform 0.2s;
@@ -30,7 +30,6 @@
     .btn-maroon { background-color: var(--ispsc-maroon); color: white; border-radius: 8px; }
     .btn-maroon:hover { background-color: #600000; color: white; }
 
-    /* Fix table row alignment */
     .table thead th { 
         border-top: none; 
         font-size: 0.8rem; 
