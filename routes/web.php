@@ -45,6 +45,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('documents.view')
             ->where('id', '.*'); 
 
+        Route::get('/stream-file/{id}', [DocumentController::class, 'streamFile'])
+        ->name('documents.stream');
+
         // 3. STORE & CREATE
         Route::get('/new', [DocumentController::class, 'create'])->name('documents.create');
         Route::post('/store', [DocumentController::class, 'store'])->name('documents.store');
@@ -53,7 +56,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // 4. ACTIONS
         Route::post('/sign/{id}', [DocumentController::class, 'sign'])->name('documents.sign');
         Route::post('/return/{id}', [DocumentController::class, 'return'])->name('documents.return');
-        Route::post('/resubmit/{id}', [DocumentController::class, 'resubmit'])->name('documents.resubmit');
+        Route::post('/resubmit/{id}', [DocumentController::class, 'resubmit'])
+            ->name('documents.resubmit')
+            ->where('id', '.*'); // <--- ADD THIS
         Route::post('/disseminate/{id}', [DocumentController::class, 'disseminate'])->name('documents.disseminate');
         Route::get('/download/{id}', [DocumentController::class, 'downloadFinal'])->name('documents.download');
         
@@ -77,6 +82,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return "Check Mailtrap!";
     });
     Route::post('/profile/change-password', [App\Http\Controllers\Admin\StaffController::class, 'changeOwnPassword'])->name('profile.password.update');
+
 });
 
 require __DIR__.'/auth.php';

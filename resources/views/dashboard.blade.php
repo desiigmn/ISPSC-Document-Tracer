@@ -5,45 +5,20 @@
 @push('css')
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
 <style>
-    :root {
-        --ispsc-maroon: #800000;
-        --ispsc-yellow: #FFCC00;
-        --ispsc-gold: #d4a017;
-    }
-    
-    /* FORCE FULL WIDTH */
-    .main-content-fluid {
-        width: 100%;
-        max-width: 100%;
-        padding: 0 40px; 
-    }
-
-    .stat-card {
-        min-height: 160px; 
-        border: none;
-        border-radius: 15px;
-        transition: transform 0.2s;
-    }
+    :root { --ispsc-maroon: #800000; --ispsc-yellow: #FFCC00; --ispsc-gold: #d4a017; }
+    .main-content-fluid { width: 100%; max-width: 100%; padding: 0 40px; }
+    .stat-card { min-height: 160px; border: none; border-radius: 15px; transition: transform 0.2s; }
     .stat-card:hover { transform: translateY(-5px); }
-
     .text-maroon { color: var(--ispsc-maroon); }
     .btn-maroon { background-color: var(--ispsc-maroon); color: white; border-radius: 8px; }
-    .btn-maroon:hover { background-color: #600000; color: white; }
-
-    .table thead th { 
-        border-top: none; 
-        font-size: 0.8rem; 
-        letter-spacing: 1px; 
-        padding: 15px;
-    }
-    .table tbody td { padding: 15px; }
-
+    .table thead th { border-top: none; font-size: 0.85rem; letter-spacing: 1px; padding: 18px; background-color: #f8f9fa; }
+    .table tbody td { padding: 18px; font-size: 1rem; }
+    .bg-icon-lg { font-size: 4rem; opacity: 0.15; }
     nav svg { max-height: 20px; }
 </style>
 @endpush
 
 @section('content')
-
 <div class="main-content-fluid">
     <!-- HEADER SECTION -->
     <div class="d-flex justify-content-between align-items-end mb-4 pt-2">
@@ -53,15 +28,11 @@
                 Welcome back, <strong>{{ Auth::user()->username }}</strong> | <span class="text-maroon fw-bold">{{ Auth::user()->office->office_name ?? 'Global Staff' }}</span>
             </p>
         </div>
-        
-        <div class="d-flex gap-2 pb-1">
-            <a href="{{ route('documents.create') }}" class="btn btn-maroon shadow-sm fw-bold px-4 py-2">
-                <i class="fa fa-plus-circle me-2"></i> NEW DOCUMENT
-            </a>
-        </div>
+        <a href="{{ route('documents.create') }}" class="btn btn-maroon shadow-sm fw-bold px-4 py-3">
+            <i class="fa fa-plus-circle me-2"></i> NEW DOCUMENT
+        </a>
     </div>
 
-    <!-- SUCCESS ALERT -->
     @if(session('msg'))
         <div class="alert alert-success border-0 shadow-sm mb-4 alert-dismissible fade show p-3" role="alert">
             <i class="fa fa-check-circle me-2"></i> {{ session('msg') }}
@@ -69,44 +40,55 @@
         </div>
     @endif
 
-    <!-- STATISTICS CARDS (LARGER & FLUID) -->
+    <!-- STATISTICS CARDS -->
     <div class="row g-4 mb-5">
-        <div class="col-md-4">
+        <div class="col-xl-3 col-md-6">
             <a href="{{ route('dashboard') }}" class="text-decoration-none">
                 <div class="card stat-card shadow-sm text-white" style="background-color: #d4a017;">
                     <div class="card-body p-4 d-flex flex-column justify-content-between">
-                        <h5 class="text-uppercase fw-bold opacity-75">Total Records</h5>
+                        <h6 class="text-uppercase fw-bold opacity-80">Total Records</h6>
                         <div class="d-flex justify-content-between align-items-center">
                             <h1 class="display-3 fw-bold mb-0">{{ $countTotal }}</h1>
-                            <i class="fa fa-folder-open opacity-25" style="font-size: 4rem;"></i>
+                            <i class="fa fa-folder-open bg-icon-lg"></i>
                         </div>
                     </div>
                 </div>
             </a>
         </div>
-
-        <div class="col-md-4">
+        <div class="col-xl-3 col-md-6">
             <a href="{{ route('dashboard', ['filter' => 'pending']) }}" class="text-decoration-none">
                 <div class="card stat-card shadow-sm text-white" style="background-color: #800000;">
                     <div class="card-body p-4 d-flex flex-column justify-content-between">
-                        <h5 class="text-uppercase fw-bold opacity-75">In Transit</h5>
+                        <h6 class="text-uppercase fw-bold opacity-80">In Transit</h6>
                         <div class="d-flex justify-content-between align-items-center">
                             <h1 class="display-3 fw-bold mb-0">{{ $countPending }}</h1>
-                            <i class="fa fa-truck-moving opacity-25" style="font-size: 4rem;"></i>
+                            <i class="fa fa-truck-moving bg-icon-lg"></i>
                         </div>
                     </div>
                 </div>
             </a>
         </div>
-
-        <div class="col-md-4">
+        <div class="col-xl-3 col-md-6">
             <a href="{{ route('dashboard', ['filter' => 'accepted']) }}" class="text-decoration-none">
                 <div class="card stat-card shadow-sm text-white" style="background-color: #1b5e20;">
                     <div class="card-body p-4 d-flex flex-column justify-content-between">
-                        <h5 class="text-uppercase fw-bold opacity-75">Finished</h5>
+                        <h6 class="text-uppercase fw-bold opacity-80">Finished</h6>
                         <div class="d-flex justify-content-between align-items-center">
                             <h1 class="display-3 fw-bold mb-0">{{ $countFinished }}</h1>
-                            <i class="fa fa-check-double opacity-25" style="font-size: 4rem;"></i>
+                            <i class="fa fa-check-double bg-icon-lg"></i>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <a href="{{ route('dashboard', ['filter' => 'shared']) }}" class="text-decoration-none">
+                <div class="card stat-card shadow-sm text-white" style="background-color: #0056b3;">
+                    <div class="card-body p-4 d-flex flex-column justify-content-between">
+                        <h6 class="text-uppercase fw-bold opacity-80">Shared Copies</h6>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h1 class="display-3 fw-bold mb-0">{{ $countShared }}</h1>
+                            <i class="fa fa-share-nodes bg-icon-lg"></i>
                         </div>
                     </div>
                 </div>
@@ -114,81 +96,82 @@
         </div>
     </div>
 
-    <!-- TRANSACTION TABLES -->
+    <!-- DYNAMIC TITLE -->
+    <div class="mb-4">
+        <h3 class="fw-bold text-dark text-uppercase">
+            @if(request('filter') == 'shared') Shared Copies @elseif(request('filter') == 'accepted') Finished Transactions @else All Active Records @endif
+        </h3>
+        <hr>
+    </div>
+
     @php
+        $filter = request('filter');
+        $user = Auth::user();
+        
         $priorities = [
             ['level' => 3, 'title' => 'Extremely Urgent', 'bg' => 'bg-danger', 'icon' => 'fa-bolt'],
             ['level' => 2, 'title' => 'Urgent', 'bg' => 'bg-warning text-dark', 'icon' => 'fa-exclamation-triangle'],
             ['level' => 1, 'title' => 'Normal / Regular', 'bg' => 'bg-secondary', 'icon' => 'fa-list-ul']
         ];
+
+        // Logic for the 4th Consolidated Table (Finished OR Shared)
+        $archiveDocs = $documents->filter(function($doc) use ($user) {
+            $isAccepted = ($doc->status == 'accepted');
+            $isShared = $doc->logs->where('office_id', $user->office_id)->where('action', 'DISSEMINATED')->count() > 0;
+            return $isAccepted || $isShared;
+        });
     @endphp
 
-    @foreach($priorities as $prio)
-        @php $filteredDocs = $documents->where('priority', $prio['level']); @endphp
-
-        @if($filteredDocs->count() > 0)
-            <div class="card shadow-sm border-0 mb-5" style="border-radius: 12px; overflow: hidden;">
-                <div class="card-header {{ $prio['bg'] }} py-3 px-4 d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-bold text-uppercase tracking-wider">
-                        <i class="fa {{ $prio['icon'] }} me-2"></i> {{ $prio['title'] }}
-                    </h5>
-                    <span class="badge bg-white text-dark rounded-pill px-3">{{ $filteredDocs->count() }} Records</span>
-                </div>
-
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table align-middle table-hover mb-0">
-                            <thead class="bg-light">
-                                <tr class="text-muted text-uppercase small fw-bold">
-                                    <th class="ps-4">Tracking ID</th>
-                                    <th>Description</th>
-                                    <th>Creator</th>
-                                    <th>Location</th>
-                                    <th>Status</th>
-                                    <th class="text-center">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($filteredDocs as $doc)
-                                <tr>
-                                    <td class="ps-4"><span class="text-maroon fw-bold font-monospace">{{ $doc->tracking_id }}</span></td>
-                                    <td>
-                                        <div class="fw-bold text-dark">{{ explode(' - ', $doc->title)[0] }}</div>
-                                        @if($doc->priority == 3)
-                                            <small class="text-danger fw-bold animate__animated animate__flash animate__infinite">ACTION REQUIRED ASAP</small>
-                                        @endif
-                                    </td>
-                                    <td>
-                                        <div class="fw-bold small text-dark">{{ $doc->uploader->username }}</div>
-                                    </td>
-                                    <td>
-                                        <i class="fa fa-building text-muted me-2 small"></i>
-                                        <span class="small fw-bold text-muted text-uppercase">{{ $doc->targetOffice->office_name ?? 'N/A' }}</span>
-                                    </td>
-                                    <td>
-                                        @php
-                                            $statBg = $doc->status == 'pending' ? '#800000' : ($doc->status == 'accepted' ? '#198754' : '#dc3545');
-                                            $statText = $doc->status == 'pending' ? 'IN TRANSIT' : ($doc->status == 'accepted' ? 'FINISHED' : strtoupper($doc->status));
-                                        @endphp
-                                        <span class="badge w-100 py-2" style="background-color: {{ $statBg }};">{{ $statText }}</span>
-                                    </td>
-                                    <td class="text-center">
-                                        <a href="{{ route('documents.view', $doc->tracking_id) }}" class="btn btn-sm btn-outline-danger px-4 rounded-pill fw-bold">
-                                            <i class="fa fa-eye me-1"></i> TRACK
-                                        </a>
-                                    </td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
+    {{-- 1-3. PENDING PRIORITY TABLES (Only shown if 'Finished' or 'Shared' cards are NOT clicked) --}}
+    @if(!$filter || $filter == 'pending' || $filter == 'records')
+        @foreach($priorities as $prio)
+            @php $prioDocs = $documents->where('priority', $prio['level'])->where('status', 'pending'); @endphp
+            @if($prioDocs->count() > 0)
+                <div class="card shadow-sm border-0 mb-5" style="border-radius: 12px; overflow: hidden;">
+                    <div class="card-header {{ $prio['bg'] }} py-3 px-4 d-flex justify-content-between align-items-center text-white">
+                        <h5 class="mb-0 fw-bold text-uppercase tracking-wider"><i class="fa {{ $prio['icon'] }} me-2"></i> {{ $prio['title'] }} (In Transit)</h5>
+                        <span class="badge bg-white text-dark rounded-pill px-3">{{ $prioDocs->count() }} Items</span>
                     </div>
+                    <div class="card-body p-0">
+                        @include('documents.partials.table_content', ['tableDocs' => $prioDocs, 'style' => 'maroon'])
+                    </div>
+                </div>
+            @endif
+        @endforeach
+    @endif
+
+    {{-- 4. CONSOLIDATED ARCHIVE TABLE (Visible in 'All Records', 'Finished', or 'Shared') --}}
+    @if(!$filter || $filter == 'accepted' || $filter == 'shared' || $filter == 'records')
+        @if($archiveDocs->count() > 0)
+            <div class="card shadow-sm border-0 mb-5" style="border-radius: 12px; overflow: hidden;">
+                <div class="card-header bg-dark text-white py-4 px-4 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold text-uppercase tracking-wider"><i class="fa fa-archive me-2"></i> Finished & Shared Records</h5>
+                    
+                    {{-- Search bar only in the combined table --}}
+                    <form action="{{ route('dashboard') }}" method="GET" class="mt-2 mt-lg-0">
+                        @if($filter) <input type="hidden" name="filter" value="{{ $filter }}"> @endif
+                        <div class="input-group shadow-sm" style="width: 500px;">
+                            <input type="text" name="search" class="form-control border-0" placeholder="Search archive..." value="{{ request('search') }}">
+                            <button class="btn btn-maroon px-3" type="submit"><i class="fa fa-search"></i></button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-body p-0">
+                    @include('documents.partials.table_content', ['tableDocs' => $archiveDocs, 'style' => 'dark'])
                 </div>
             </div>
         @endif
-    @endforeach
+    @endif
 
-    <!-- PAGINATION -->
-    @if($documents->hasPages())
+    @if($documents->count() == 0)
+        <div class="text-center py-5 bg-white rounded-3 shadow-sm mb-5 border border-dashed">
+            <i class="fa fa-folder-open fa-5x text-muted opacity-10 mb-3"></i>
+            <h4 class="text-muted">No documents found.</h4>
+        </div>
+    @endif
+
+    <!-- PAGINATION (Numeric check for Paginator Instance) -->
+    @if(method_exists($documents, 'hasPages') && $documents->hasPages())
         <div class="d-flex justify-content-center pb-5">
             {{ $documents->links() }}
         </div>
