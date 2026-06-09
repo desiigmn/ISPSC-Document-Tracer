@@ -30,9 +30,6 @@
             </p>
         </div>
         <div class="d-flex gap-2 pb-1">
-            @if(Auth::user()->role === 'superadmin')
-                <a href="{{ route('admin.personnel') }}" class="btn btn-dark shadow-sm fw-bold px-4 py-3"><i class="fa fa-users-cog me-2"></i> PERSONNEL</a>
-            @endif
             <a href="{{ route('documents.create') }}" class="btn btn-maroon shadow-sm fw-bold px-4 py-3"><i class="fa fa-plus-circle me-2"></i> NEW DOCUMENT</a>
         </div>
     </div>
