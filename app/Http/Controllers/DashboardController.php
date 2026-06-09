@@ -15,44 +15,57 @@ public function index(Request $request)
     $user = Auth::user();
     $query = Document::query()->with(['uploader', 'targetOffice', 'logs']);
 
-    // 1. ACCESS CONTROL
+    // 1. Identify Roles
     $recordsOfficeId = 'ISPSC-MC-REC-2026-4URQGK';
-    $isSuperAdmin = ($user->role === 'superadmin');
-    $isRecordsStaff = ($user->office_id === $recordsOfficeId);
+    $isAdminOrRecords = ($user->role === 'superadmin' || $user->office_id === $recordsOfficeId);
 
-    if (!$isSuperAdmin && !$isRecordsStaff) {
+    // 2. Access Control (Regular staff only see their own/involved/disseminated docs)
+    if (!$isAdminOrRecords) {
         $query->where(function($q) use ($user) {
             $q->where('uploader_id', $user->id)
               ->orWhereHas('signatories', function($sub) use ($user) {
                   $sub->where('user_id', $user->id);
               })
               ->orWhereHas('logs', function($sub) use ($user) {
-                  $sub->where('office_id', $user->office_id)
-                      ->where('action', 'DISSEMINATED');
+                  $sub->where('office_id', $user->office_id)->where('action', 'DISSEMINATED');
               });
         });
     }
 
+    // 3. Clone for counts (Keep card numbers accurate)
     $baseQuery = clone $query;
 
-    // 2. SEARCH
-    if ($request->filled('search')) {
-        $query->where('tracking_id', 'LIKE', '%' . $request->search . '%')
-              ->orWhere('title', 'LIKE', '%' . $request->search . '%');
+    // 4. THE FIX: Filtering Logic
+    if ($request->filter == 'accepted') {
+        $query->where('status', 'accepted');
+    } elseif ($request->filter == 'pending') {
+        $query->where('status', 'pending');
+    } elseif ($request->filter == 'shared') {
+        $query->whereHas('logs', function($q) use ($user, $isAdminOrRecords) {
+            $q->where('action', 'DISSEMINATED');
+            if (!$isAdminOrRecords) $q->where('office_id', $user->office_id);
+        });
+    } else {
+        // DEFAULT VIEW: 
+        // For Admins: Get both pending and accepted so they both show in separate tables
+        // For Staff: Just show pending
+        if (!$isAdminOrRecords) {
+            $query->where('status', 'pending');
+        }
     }
 
-    // 3. FETCH PAGINATED RESULTS (30 per page)
-    // We sort by Priority so Extreme/Urgent appear first in the collection
+    // 5. Fetch Final Results
     $documents = $query->orderBy('priority', 'desc')->latest()->paginate(30)->appends($request->all());
 
-    // 4. COUNTS FOR CARDS
+    // 6. Calculate Counts
     $countTotal = $baseQuery->count();
     $countPending = (clone $baseQuery)->where('status', 'pending')->count();
     $countFinished = (clone $baseQuery)->where('status', 'accepted')->count();
-    $countShared = (clone $baseQuery)->whereHas('logs', function($sub) use ($user) {
-        $sub->where('office_id', $user->office_id)->where('action', 'DISSEMINATED');
+    $countShared = (clone $baseQuery)->whereHas('logs', function($q) use ($user, $isAdminOrRecords) {
+        $q->where('action', 'DISSEMINATED');
+        if (!$isAdminOrRecords) $q->where('office_id', $user->office_id);
     })->count();
 
-    return view('dashboard', compact('documents', 'countTotal', 'countPending', 'countFinished', 'countShared', 'user'));
+    return view('dashboard', compact('documents', 'countTotal', 'countPending', 'countFinished', 'countShared'));
 }
 }

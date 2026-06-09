@@ -54,11 +54,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/delete/{id}', [DocumentController::class, 'destroy'])->name('documents.delete');
 
         // 4. ACTIONS
-        Route::post('/sign/{id}', [DocumentController::class, 'sign'])->name('documents.sign');
-        Route::post('/return/{id}', [DocumentController::class, 'return'])->name('documents.return');
+        // Inside your document prefix group
+        Route::post('/sign/{id}', [DocumentController::class, 'sign'])
+            ->name('documents.sign')
+            ->where('id', '.*'); // <--- CRITICAL FIX
+        // Inside the document prefix group
+        Route::post('/return/{id}', [DocumentController::class, 'return'])
+            ->name('documents.return')
+            ->where('id', '.*'); // Allow slashes
+
         Route::post('/resubmit/{id}', [DocumentController::class, 'resubmit'])
             ->name('documents.resubmit')
-            ->where('id', '.*'); // <--- ADD THIS
+            ->where('id', '.*'); // Allow slashes
         Route::post('/disseminate/{id}', [DocumentController::class, 'disseminate'])->name('documents.disseminate');
         Route::get('/download/{id}', [DocumentController::class, 'downloadFinal'])->name('documents.download');
         

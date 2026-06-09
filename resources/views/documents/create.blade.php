@@ -131,23 +131,14 @@
                     </div>
                 </div>
 
-<!-- CARD 2: DOCUMENT DETAILS, CLASSIFICATION & PRIORITY -->
+<!-- CARD 2: CLASSIFICATION & PRIORITY -->
 <div class="card ispsc-card shadow-sm mb-4">
     <div class="card-body p-4">
         <div class="section-title mb-4">
-            <i class="fa fa-file-alt me-2"></i> Document Details
+            <i class="fa fa-tags me-2"></i> Classification & Priority
         </div>
         
         <div class="row g-4 align-items-start">
-            <!-- NEW: Document Title Field -->
-            <div class="col-12 mb-2">
-                <label class="form-label small fw-bold text-uppercase text-secondary">Document Title / Subject</label>
-                <input type="text" name="title" class="form-control form-control-lg border-maroon-focus" 
-                       placeholder="e.g. Request for ICT Equipment Repair or 2024 Budget Realignment" 
-                       value="{{ old('title') }}" style="font-size: 1rem;" required>
-                <div class="form-text small">Provide a clear, descriptive title for this transaction.</div>
-            </div>
-
             <!-- Classification Dropdown -->
             <div class="col-md-6">
                 <label class="form-label small fw-bold text-uppercase text-secondary">Document/Item Type</label>
@@ -157,52 +148,37 @@
                         <option value="Memorandum">Memorandum</option>
                         <option value="Special Order">Special Order</option>
                         <option value="Communication Letter">Communication Letter</option>
-                        <option value="Resolution">Resolution</option>
                     </optgroup>
-                    <optgroup label="Financial/Logistics">
-                        <option value="Disbursement Voucher">Disbursement Voucher</option>
+                    <optgroup label="Logistics">
                         <option value="Purchase Request">Purchase Request</option>
-                        <option value="Payroll">Payroll / Payslip</option>
                         <option value="Device/Equipment">Device / Equipment</option>
-                    </optgroup>
-                    <optgroup label="Academic/Administrative">
-                        <option value="Student Record">Student Record</option>
-                        <option value="Travel Order">Travel Order</option>
                     </optgroup>
                     <option value="Others">Others (Please specify...)</option>
                 </select>
 
-                <!-- Hidden Input for "Others" -->
+                <!-- Hidden Input: Only appears if "Others" is selected -->
                 <div id="otherInputContainer" class="mt-3 d-none animate__animated animate__fadeIn">
-                    <label class="form-label small fw-bold text-uppercase text-maroon" style="font-size: 0.75rem;">Specify Other Classification</label>
-                    <input type="text" name="classification_other" id="otherClassification" class="form-control form-control-sm border-maroon-focus" placeholder="Type document type here...">
+                    <label class="form-label small fw-bold text-uppercase text-maroon" style="font-size: 0.75rem;">Specify Type</label>
+                    <input type="text" name="custom_title" id="otherClassification" class="form-control form-control-sm border-maroon-focus" placeholder="e.g. Clearance Form">
                 </div>
             </div>
 
-
-            <!-- Priority Level (Segmented UI) -->
+            <!-- Priority Level -->
             <div class="col-md-6">
                 <label class="form-label small fw-bold text-uppercase text-secondary">Priority Level</label>
-                <div class="btn-group w-100" role="group" aria-label="Priority Selection">
+                <div class="btn-group w-100" role="group">
                     <input type="radio" class="btn-check" name="priority" id="prio3" value="3" autocomplete="off">
-                    <label class="btn btn-outline-danger py-2 fw-bold" for="prio3">
-                        <i class="fa fa-bolt me-1"></i> Extreme
-                    </label>
+                    <label class="btn btn-outline-danger py-2 fw-bold" for="prio3"><i class="fa fa-bolt me-1"></i> Extreme</label>
 
                     <input type="radio" class="btn-check" name="priority" id="prio2" value="2" autocomplete="off">
-                    <label class="btn btn-outline-warning py-2 fw-bold" for="prio2">
-                        <i class="fa fa-exclamation-circle me-1"></i> Urgent
-                    </label>
+                    <label class="btn btn-outline-warning py-2 fw-bold" for="prio2"><i class="fa fa-exclamation-triangle me-1"></i> Urgent</label>
 
                     <input type="radio" class="btn-check" name="priority" id="prio1" value="1" autocomplete="off" checked>
-                    <label class="btn btn-outline-secondary py-2 fw-bold" for="prio1">
-                        <i class="fa fa-check me-1"></i> Normal
-                    </label>
+                    <label class="btn btn-outline-secondary py-2 fw-bold" for="prio1"><i class="fa fa-check me-1"></i> Normal</label>
                 </div>
-                <div class="form-text small mt-2">Determines the priority level in the transaction history.</div>
             </div>
 
-            <!-- Hard Copy Toggle (Highlighted Box) -->
+            <!-- Hard Copy Toggle -->
             <div class="col-12">
                 <div class="p-3 rounded-3 border bg-light d-flex align-items-center justify-content-between shadow-sm">
                     <div class="d-flex align-items-center">

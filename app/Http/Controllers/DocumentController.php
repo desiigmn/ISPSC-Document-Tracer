@@ -31,124 +31,118 @@ class DocumentController extends Controller
     }
 
     /**
-     * STORE: Register document and send IMMEDIATE Email Alert
+     * STORE: Register document and handle automatic Title/ID generation
      */
-public function store(Request $request)
-{
-    $isHardCopy = $request->has('is_hard_copy');
+    public function store(Request $request)
+    {
+        $isHardCopy = $request->has('is_hard_copy');
 
-    // 1. Unified Validation
-    $request->validate([
-        'title' => 'required|string|max:255',
-        'classification' => 'required',
-        'classification_other' => $request->classification === 'Others' ? 'required|string|max:100' : 'nullable',
-        'target_office_id' => 'required',
-        'signatory_names' => 'required|array|min:1',
-        'priority' => 'required|integer',
-        'physical_description' => $isHardCopy ? 'required|string|max:255' : 'nullable',
-        'doc_files' => $isHardCopy ? 'nullable' : 'required|array',
-    ]);
+        // 1. Unified Validation
+        $request->validate([
+            'classification' => 'required',
+            'custom_title' => $request->classification === 'Others' ? 'required|string|max:100' : 'nullable',
+            'target_office_id' => 'required',
+            'signatory_names' => 'required|array|min:1',
+            'priority' => 'required|integer',
+            'physical_description' => $isHardCopy ? 'required|string|max:255' : 'nullable',
+            'doc_files' => $isHardCopy ? 'nullable' : 'required|array',
+            'doc_files.*' => 'required|mimes:pdf,jpg,jpeg,png|max:51200', // Set to 50MB (51200 KB)
+        ]);
 
-return DB::transaction(function () use ($request, $isHardCopy) {
-    // 1. Determine the Suffix based on Priority
-    $suffix = match((int)$request->priority) {
-        3 => 'EXT',
-        2 => 'URG',
-        default => 'NOR',
-    };
-
-    // 2. Generate Tracking ID: ISPSC-month/day/year-hour/minutes/seconds-SUFFIX
-    // Using H/i/s (24-hour) or h/i/s (12-hour). I'll use H/i/s for uniqueness.
-    $trackingId = "ISPSC-" . now()->format('m/d/Y-H/i/s') . "-" . $suffix;
-    
-    $title = $isHardCopy 
-        ? $request->physical_description 
-        : (($request->classification == 'Others') ? $request->custom_title : $request->classification);
-
-    // 3. Create Document Record
-    $document = Document::create([
-        'tracking_id' => $trackingId,
-        'title' => $title,
-        'classification' => $request->classification,
-        'priority' => $request->priority,
-        'status' => 'pending',
-        'uploader_id' => Auth::id(),
-        'is_hard_copy' => $isHardCopy,
-        'current_office_id' => Auth::user()->office_id, 
-        'target_office_id' => $request->target_office_id,
-        'file_path' => $isHardCopy ? 'PHYSICAL_ITEM' : '',
-        'current_step' => 1
-    ]);
-
-        // 5. Handle Files (if Digital)
-        if (!$isHardCopy && $request->hasFile('doc_files')) {
-            foreach ($request->file('doc_files') as $index => $file) {
-                $path = $file->storeAs('documents', time() . '_' . $file->getClientOriginalName(), 'public');
-                
-                // Update the main file_path with the first file uploaded
-                if ($index === 0) {
-                    $document->update(['file_path' => $path]);
-                }
-
-                DocumentAttachment::create([
-                    'document_id' => $document->id,
-                    'file_path'   => $path,
-                    'file_name'   => $file->getClientOriginalName(),
-                    'file_type'   => $file->getMimeType()
-                ]);
+        return DB::transaction(function () use ($request, $isHardCopy) {
+            
+            // 2. Automated Title Generation (Fixes "Title field doesn't have default value")
+            if ($isHardCopy) {
+                $title = $request->physical_description; 
+            } else {
+                $title = ($request->classification === 'Others') ? $request->custom_title : $request->classification;
             }
-        }
 
-        // 6. Create Signatories & Handle Notifications
-        foreach ($request->signatory_names as $index => $name) {
-            $user = User::where('username', $name)->first();
-            if ($user) {
-                Signatory::create([
-                    'document_id' => $document->id, 
-                    'user_id'     => $user->id, 
-                    'sign_order'  => $index + 1, 
-                    'status'      => 'pending'
-                ]);
+            // 3. Determine Suffix and Generate Tracking ID
+            $suffix = match((int)$request->priority) {
+                3 => 'EXT',
+                2 => 'URG',
+                default => 'NOR',
+            };
+            $trackingId = "ISPSC-" . now()->format('m/d/Y-H:i:s') . "-" . $suffix;
 
-                // Notify the FIRST signatory immediately
-                if ($index === 0) {
-                    Notification::create([
-                        'user_id' => $user->id,
-                        'type'    => 'incoming', 
-                        'message' => "Action Required: New Document {$document->tracking_id}",
-                        'link'    => route('documents.view', $document->id)
+            // 4. Create Document Record
+            $document = Document::create([
+                'tracking_id' => $trackingId,
+                'title' => $title,
+                'classification' => $request->classification,
+                'priority' => $request->priority,
+                'status' => 'pending',
+                'uploader_id' => Auth::id(),
+                'is_hard_copy' => $isHardCopy,
+                'current_office_id' => Auth::user()->office_id, 
+                'target_office_id' => $request->target_office_id,
+                'file_path' => $isHardCopy ? 'PHYSICAL_ITEM' : '',
+                'current_step' => 1
+            ]);
+
+            // 5. Handle File Uploads (Digital only)
+            if (!$isHardCopy && $request->hasFile('doc_files')) {
+                foreach ($request->file('doc_files') as $index => $file) {
+                    $path = $file->storeAs('documents', time() . '_' . $file->getClientOriginalName(), 'public');
+                    
+                    if ($index === 0) $document->update(['file_path' => $path]);
+
+                    DocumentAttachment::create([
+                        'document_id' => $document->id,
+                        'file_path'   => $path,
+                        'file_name'   => $file->getClientOriginalName(),
+                        'file_type'   => $file->getMimeType()
+                    ]);
+                }
+            }
+
+            // 6. Create Signatories & Initial Notifications
+            foreach ($request->signatory_names as $index => $name) {
+                $user = User::where('username', $name)->first();
+                if ($user) {
+                    Signatory::create([
+                        'document_id' => $document->id, 
+                        'user_id'     => $user->id, 
+                        'sign_order'  => $index + 1, 
+                        'status'      => 'pending'
                     ]);
 
-                    // Send email if Priority is Urgent (2) or Extreme (3)
-                    if ($document->priority >= 2 && !empty($user->email)) {
-                        try {
-                            Mail::to($user->email)->send(new UrgentDocumentAlert($document, false));
-                        } catch (\Exception $e) { 
-                            \Log::error("Mail failed for {$user->email}: " . $e->getMessage()); 
+                    if ($index === 0) {
+                        Notification::create([
+                            'user_id' => $user->id,
+                            'type'    => 'incoming', 
+                            'message' => "Action Required: {$document->tracking_id}",
+                            'link'    => route('documents.view', $document->id)
+                        ]);
+
+                        if ($document->priority >= 2 && !empty($user->email)) {
+                            try {
+                                Mail::to($user->email)->send(new UrgentDocumentAlert($document, false));
+                            } catch (\Exception $e) { \Log::error("Mail failed: " . $e->getMessage()); }
                         }
                     }
                 }
             }
-        }
 
-        // 7. Initial Log
-        DocumentLog::create([
-            'document_id' => $document->id,
-            'user_id'     => Auth::id(),
-            'action'      => 'CREATED',
-            'office_id'   => Auth::user()->office_id,
-            'remarks'     => $isHardCopy ? "Physical item registered: " . $request->physical_description : "Digital document uploaded."
-        ]);
+            // 7. Initial Log
+            DocumentLog::create([
+                'document_id' => $document->id,
+                'user_id'     => Auth::id(),
+                'action'      => 'TIME OF HELLO',
+                'office_id'   => Auth::user()->office_id,
+                'remarks'     => $isHardCopy ? "Physical item registered: " . $title : "Digital document uploaded: " . $title
+            ]);
 
-        // 8. Redirect
-        if ($isHardCopy) {
-            return redirect()->route('dashboard')->with('msg', 'Physical Tracking Started!');
-        }
-        
-        return redirect()->route('documents.map', $document->id)->with('msg', 'Digital Routing Started!');
-    });
-}
-    /**
+            // 8. Final Redirect Logic
+            if ($isHardCopy) {
+                return redirect()->route('dashboard')->with('msg', 'Physical Tracking Started Successfully!');
+            }
+            
+            return redirect()->route('documents.map', $document->id)->with('msg', 'Digital Routing Started! Please place signature tags.');
+        });
+    }
+/**
      * SHOW: HUB
      */
     public function show($id)
@@ -226,6 +220,10 @@ return DB::transaction(function () use ($request, $isHardCopy) {
      */
     public function previewWithSigs($id)
     {
+            ini_set('memory_limit', '512M'); 
+            set_time_limit(300);
+
+            $document = Document::with('signatories.user')->findOrFail($id);
         $document = Document::with('signatories.user')->findOrFail($id);
         $pdf = new Fpdi();
         $filePath = storage_path('app/public/' . $document->file_path);
@@ -259,17 +257,37 @@ return DB::transaction(function () use ($request, $isHardCopy) {
         return response()->json(['status' => 'OK']);
     }
 
-    public function return(Request $request, $id)
-    {
-        $request->validate(['remarks' => 'required|string|max:500']);
-        $document = Document::findOrFail($id);
-        return DB::transaction(function () use ($request, $document) {
-            $document->update(['status' => 'returned']);
-            DocumentLog::create(['document_id' => $document->id, 'user_id' => Auth::id(), 'action' => 'DOCUMENT RETURNED', 'office_id' => Auth::user()->office_id, 'remarks' => "Reason: " . $request->remarks]);
-            Notification::create(['user_id' => $document->uploader_id, 'type' => 'returned', 'message' => "Document {$document->tracking_id} returned.", 'link' => route('documents.view', $document->id)]);
-            return response()->json(['status' => 'success']);
-        });
-    }
+/**
+ * 7. RETURN: Signatory sends document back to creator
+ */
+public function return(Request $request, $id)
+{
+    $request->validate(['remarks' => 'required|string|max:500']);
+
+    // Find by numeric ID or Tracking ID
+    $document = Document::where('id', $id)->orWhere('tracking_id', $id)->firstOrFail();
+
+    return DB::transaction(function () use ($request, $document) {
+        $document->update(['status' => 'returned']);
+
+        DocumentLog::create([
+            'document_id' => $document->id,
+            'user_id' => Auth::id(),
+            'action' => 'DOCUMENT RETURNED',
+            'office_id' => Auth::user()->office_id,
+            'remarks' => "REASON: " . $request->remarks 
+        ]);
+
+        Notification::create([
+            'user_id' => $document->uploader_id,
+            'type' => 'returned',
+            'message' => "URGENT: Document {$document->tracking_id} was returned for correction.",
+            'link' => route('documents.view', $document->tracking_id)
+        ]);
+
+        return response()->json(['status' => 'success']);
+    });
+}
 
 /**
  * DISSEMINATE: Share finalized document with multiple offices.
@@ -354,31 +372,33 @@ public function streamFile($id)
     // This streams the file directly to the browser with correct headers
     return response()->file(storage_path('app/public/' . $document->file_path));
 }
+/**
+ * 8. RESUBMIT: Creator uploads corrected files
+ */
 public function resubmit(Request $request, $id)
 {
     $request->validate([
         'doc_files' => 'required|array',
-        'doc_files.*' => 'required|mimes:pdf,jpg,jpeg,png,docx|max:10240'
+        'doc_files.*' => 'required|mimes:pdf,jpg,jpeg,png,docx,doc|max:10240'
     ]);
 
     // Find document by numeric ID or Tracking ID
-    $document = Document::with('attachments')->where('id', $id)->orWhere('tracking_id', $id)->firstOrFail();
+    $document = Document::with('signatories')->where('id', $id)->orWhere('tracking_id', $id)->firstOrFail();
 
-    // Security: Only the creator can resubmit
     if ($document->uploader_id !== Auth::id()) abort(403);
 
     return DB::transaction(function () use ($request, $document) {
-        // 1. Delete Old Attachments from Storage and Database
+        // 1. Handle File Replacement
+        // Delete old attachments
         foreach ($document->attachments as $oldFile) {
             Storage::disk('public')->delete($oldFile->file_path);
             $oldFile->delete();
         }
 
-        // 2. Upload New Files
+        // Upload new files
         if ($request->hasFile('doc_files')) {
             foreach ($request->file('doc_files') as $index => $file) {
                 $path = $file->storeAs('documents', time() . '_' . $file->getClientOriginalName(), 'public');
-                
                 if ($index === 0) $document->update(['file_path' => $path]);
 
                 DocumentAttachment::create([
@@ -390,25 +410,30 @@ public function resubmit(Request $request, $id)
             }
         }
 
-        // 3. RESET THE CYCLE
-        $document->update([
-            'status' => 'pending',
-            'current_step' => 1 // Restart from first signer
-        ]);
+        // 2. LOGIC FIX: PRESERVE PREVIOUS SIGNATURES
+        // We only reset the status of the current person (who returned it) 
+        // and anyone further down the list.
+        $document->signatories()
+            ->where('sign_order', '>=', $document->current_step)
+            ->update([
+                'status' => 'pending',
+                'signed_at' => null
+                // Note: We do NOT clear signature_data or coordinates for previous steps
+            ]);
 
-        // 4. Reset Signatory Statuses
-        $document->signatories()->update(['status' => 'pending', 'signed_at' => null]);
+        // 3. Set document back to pending
+        $document->update(['status' => 'pending']);
 
-        // 5. Add Audit Log
+        // 4. Audit Log
         DocumentLog::create([
             'document_id' => $document->id,
             'user_id' => Auth::id(),
             'action' => 'RE-SUBMITTED',
             'office_id' => Auth::user()->office_id,
-            'remarks' => 'Corrected document uploaded. Tracking cycle restarted.'
+            'remarks' => 'Corrected document uploaded. Existing valid signatures were preserved.'
         ]);
 
-        return redirect()->route('documents.view', $document->tracking_id)->with('msg', 'Document re-submitted successfully!');
+        return redirect()->route('documents.view', $document->tracking_id)->with('msg', 'Document resubmitted. Signatures from previous steps were kept.');
     });
 }
 }

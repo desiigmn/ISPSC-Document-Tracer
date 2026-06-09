@@ -336,6 +336,7 @@
                         <input type="file" id="sig-file" class="form-control" accept="image/*">
                         <img id="sig-preview" class="d-none border rounded w-100 mt-2 shadow-sm">
                     </div>
+                    
                 </div>
             </div>
             <div class="modal-footer"><button type="button" class="btn btn-success w-100 fw-bold shadow-sm" id="btn-submit-signature">CONFIRM & SIGN</button></div>
@@ -433,9 +434,12 @@
             submitAction("{{ route('documents.sign', $document->id) }}", { signature_data: 'PHYSICAL_RECEIPT' });
         });
 
+        // Return Logic
         document.getElementById('confirm-return')?.addEventListener('click', function() {
             const remarks = document.getElementById('return-remarks').value;
-            if(!remarks) return alert("Please provide a reason.");
+            if(!remarks) return alert("Please provide a reason for returning.");
+            
+            // Using $document->id (the number) is safest for the URL
             submitAction("{{ route('documents.return', $document->id) }}", { remarks: remarks });
         });
 
