@@ -70,7 +70,7 @@
         <div class="card-accent"></div>
         <div class="card-body p-5">
             <div class="mb-4">
-                <span class="brand-text">V-ACTION SLIP</span>
+                <span class="brand-text">DOCUMENT TRACER</span>
             </div>
 
             <div class="icon-box">

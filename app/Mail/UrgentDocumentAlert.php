@@ -29,10 +29,11 @@ class UrgentDocumentAlert extends Mailable
      */
     public function envelope(): Envelope
     {
-        $prefix = $this->isReminder ? "REMINDER: " : "URGENT: ";
+        $prefix = $this->isReminder ? "[NUDGE] " : "URGENT: ";
         
         return new Envelope(
-            subject: $prefix . $this->document->tracking_id,
+            // FIXED: Added "$this->" before document
+            subject: $prefix . $this->document->tracking_id . " - Action Required",
         );
     }
 
@@ -43,8 +44,6 @@ class UrgentDocumentAlert extends Mailable
     {
         return new Content(
             view: 'emails.urgent_alert',
-            // Public properties ($document, $isReminder) are automatically 
-            // available in the view, so we don't strictly need the 'with' array.
         );
     }
 
