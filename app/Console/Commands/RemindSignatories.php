@@ -32,15 +32,6 @@ class RemindSignatories extends Command
             $currentSig = Signatory::where('document_id', $doc->id)
                 ->where('sign_order', $doc->current_step)
                 ->first();
-            
-            if($currentSig) {
-                Notification::create([
-                    'user_id' => $currentSig->user_id,
-                    'type' => 'stale',
-                    'message' => "REMINDER: Document {$doc->tracking_id} has been waiting for 8 hours.",
-                    'link' => route('documents.view', $doc->id)
-                ]);
-            }
         }
     }
 }
