@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use setasign\Fpdi\Fpdi;
 use Illuminate\Support\Facades\Hash;
 
@@ -145,12 +146,33 @@ class DocumentController extends Controller
 /**
      * SHOW: HUB
      */
-    public function show($id)
+public function show($id)
+{
+    $document = Document::with(['logs.user', 'signatories.user', 'uploader'])
+                ->where('id', $id)->orWhere('tracking_id', $id)->firstOrFail();
+    
+    $user = Auth::user();
+    
+    // THE CRITICAL CHECK FOR SHARED ACCESS
+    $isDisseminatedToMe = $document->logs()
+                        ->where('office_id', $user->office_id)
+                        ->where('action', 'DISSEMINATED')
+                        ->exists();
+
+    // Permissions check logic (Superadmin OR involved parties OR if disseminated)
+    if ($user->role !== 'superadmin' && 
+        $document->uploader_id != $user->id && 
+        !$document->signatories->contains('user_id', $user->id) && 
+        !$isDisseminatedToMe) 
     {
-        $document = Document::with(['logs.user', 'signatories.user', 'uploader'])
-                    ->where('id', $id)->orWhere('tracking_id', $id)->firstOrFail();
-        return view('documents.view', compact('document'));
+        abort(403);
     }
+
+    // Generate tracking QR (for current user/document)
+    $qrCode = \SimpleSoftwareIO\QrCode\Facades\QrCode::size(150)->color(128,0,0)->generate(route('documents.view', $document->tracking_id));
+
+    return view('documents.view', compact('document', 'qrCode'));
+}
 
     /**
      * SIGN: Apply signature/receipt and notify NEXT person immediately via email
@@ -215,19 +237,43 @@ class DocumentController extends Controller
         });
     }
 
-    /**
-     * PREVIEW: Live generation (Numeric ID to avoid 404)
+/**
+     * PREVIEW: Live generation with signature overlay.
+     * Accessible by involved parties OR shared offices.
      */
     public function previewWithSigs($id)
     {
-            ini_set('memory_limit', '512M'); 
-            set_time_limit(300);
+        // 1. PERFORMANCE TWEAKS
+        ini_set('memory_limit', '1024M'); // Increased for large files
+        set_time_limit(300);
 
-            $document = Document::with('signatories.user')->findOrFail($id);
-        $document = Document::with('signatories.user')->findOrFail($id);
+        // 2. FIND DOCUMENT (Numeric ID or Tracking ID)
+        $document = Document::with(['signatories.user', 'logs'])
+                    ->where('id', $id)->orWhere('tracking_id', $id)->firstOrFail();
+
+        // 3. SECURITY GATE
+        $user = Auth::user();
+        
+        // Logic: Is it disseminated to my office?
+        $isDisseminatedToMe = $document->logs
+            ->where('office_id', $user->office_id)
+            ->where('action', 'DISSEMINATED')
+            ->count() > 0;
+
+        // Is involved? (Signatory, Creator, or Records Office Head)
+        $isCreator = ($document->uploader_id == $user->id);
+        $isSignatory = $document->signatories->contains('user_id', $user->id);
+        $isAdminOrRecords = ($user->role === 'superadmin' || str_contains($user->office_id, '-REC-'));
+
+        // If none of these are true, Block access
+        if (!$isAdminOrRecords && !$isCreator && !$isSignatory && !$isDisseminatedToMe) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        // 4. GENERATE PDF WITH FPDI
         $pdf = new Fpdi();
         $filePath = storage_path('app/public/' . $document->file_path);
-        if (!file_exists($filePath)) abort(404);
+        if (!file_exists($filePath)) abort(404, "Original file missing.");
 
         $pageCount = $pdf->setSourceFile($filePath);
         for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
@@ -237,19 +283,34 @@ class DocumentController extends Controller
             $pdf->useTemplate($templateId);
 
             foreach ($document->signatories as $sig) {
-                if ($sig->status == 'signed' && $sig->signature_data && $sig->signature_data !== 'PHYSICAL_RECEIPT' && intval($sig->page_num ?? 1) == $pageNo) {
+                // Overlay signatures only if Signed and correct page
+                if ($sig->status == 'signed' && 
+                    $sig->signature_data && 
+                    $sig->signature_data !== 'PHYSICAL_RECEIPT' && 
+                    intval($sig->page_num ?? 1) == $pageNo) {
+                    
                     $imgData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $sig->signature_data));
-                    $tempPath = storage_path('app/public/temp_'.uniqid().'.png');
+                    $tempPath = storage_path('app/public/temp_view_'.uniqid().'.png');
                     file_put_contents($tempPath, $imgData);
+                    
+                    // Position calculated from 0-100 coordinates
                     $pdf->Image($tempPath, ($sig->x_pos/100)*$size['width']-15, ($sig->y_pos/100)*$size['height']-10, 30);
                     unlink($tempPath);
                 }
             }
         }
+        
+        // Return stream
         return response($pdf->Output('S'), 200)->header('Content-Type', 'application/pdf');
     }
 
-    public function downloadFinal(Request $request, $id) { return $this->previewWithSigs($id); }
+    /**
+     * FINAL DOWNLOAD: Resues the same secure preview logic
+     */
+    public function downloadFinal(Request $request, $id) 
+    { 
+        return $this->previewWithSigs($id); 
+    }
     public function map($id) { $document = Document::with('signatories.user')->findOrFail($id); return view('documents.map', compact('document')); }
     public function saveTag(Request $request) { 
         Signatory::where('document_id', $request->doc_id)->where('user_id', $request->user_id)
@@ -435,5 +496,51 @@ public function resubmit(Request $request, $id)
 
         return redirect()->route('documents.view', $document->tracking_id)->with('msg', 'Document resubmitted. Signatures from previous steps were kept.');
     });
+    
+}
+public function downloadQr($id)
+{
+    // Find the document
+    $document = Document::where('id', $id)->orWhere('tracking_id', $id)->firstOrFail();
+    
+    // Generate as SVG (Does NOT require Imagick)
+    $qrCode = QrCode::size(500)
+        ->color(128, 0, 0) // Maroon
+        ->margin(1)
+        ->generate(route('documents.view', $document->tracking_id));
+
+    // Return as a downloadable SVG file
+    return response($qrCode)
+        ->header('Content-Type', 'image/svg+xml')
+        ->header('Content-Disposition', 'attachment; filename="QR_'.$document->id.'.svg"');
+}
+public function discard($id)
+{
+    // Find document with relations
+    $document = Document::with(['signatories.user', 'attachments'])->findOrFail($id);
+    if ($document->uploader_id !== Auth::id()) abort(403);
+
+    // Capture the data to be restored in the form
+    $formData = [
+        'classification' => $document->classification,
+        'priority' => $document->priority,
+        'target_office_id' => $document->target_office_id,
+        'is_hard_copy' => $document->is_hard_copy,
+        'physical_description' => ($document->is_hard_copy) ? $document->title : null,
+        'custom_title' => ($document->classification == 'Others' && !$document->is_hard_copy) ? $document->title : null,
+        // Map signers back to the name array
+        'signatory_names' => $document->signatories->sortBy('sign_order')->pluck('user.username')->toArray()
+    ];
+
+    // Delete uploaded files so storage stays clean
+    foreach ($document->attachments as $file) {
+        \Illuminate\Support\Facades\Storage::disk('public')->delete($file->file_path);
+    }
+
+    // Delete the database draft
+    $document->delete();
+
+    // Redirect with "Flashing" input
+    return redirect()->route('documents.create')->withInput($formData);
 }
 }

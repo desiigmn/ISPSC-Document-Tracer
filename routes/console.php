@@ -9,3 +9,4 @@ Schedule::command('app:send-urgent-reminders')->dailyAt('08:00');
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+Schedule::command('app:send-reminders')->hourly();

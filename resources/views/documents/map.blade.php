@@ -319,15 +319,41 @@
     };
 
     window.cancelMapping = function(e) {
-        if (!confirm("Are you sure you want to discard this document?")) return;
-        const btn = e.target.closest('button');
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Discarding...';
-        
-        fetch("{{ route('documents.delete', $document->id) }}", {
-            method: 'DELETE',
-            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' }
-        }).then(() => window.location.href = "{{ route('dashboard') }}");
+        Swal.fire({
+            title: 'Discard Document?',
+            text: "This will permanently delete the uploaded files. You cannot undo this.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545', // Red
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, discard it',
+            cancelButtonText: 'Go back'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const btn = e.target.closest('button');
+                btn.disabled = true;
+                fetch("{{ route('documents.delete', $document->id) }}", {
+                    method: 'DELETE',
+                    headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
+                }).then(() => window.location.href = "{{ route('dashboard') }}");
+            }
+        });
     };
+window.cancelMapping = function(e) {
+    Swal.fire({
+        title: 'GO BACK TO EDIT?',
+        text: "We will discard your current progress, but we'll save your form details so you don't have to re-type them.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#800000',
+        confirmButtonText: 'YES, GO BACK',
+        cancelButtonText: 'STAY HERE'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // THE CRITICAL URL: Uses url() and Numeric ID to prevent slash errors
+            window.location.href = "{{ url('/document/discard/' . $document->id) }}";
+        }
+    });
+};
 </script>
 @endpush

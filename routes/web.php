@@ -18,6 +18,7 @@ Auth::routes(['register' => false]);
 Route::middleware(['auth', 'verified'])->group(function () {
     
     // DASHBOARD
+    Route::get('/documents/{id}', [DocumentController::class, 'show'])->name('documents.show');
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard', [DashboardController::class, 'index']);
 
@@ -74,6 +75,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/save-tag', [DocumentController::class, 'saveTag'])->name('documents.saveTag');
         Route::post('/delete-tag', [DocumentController::class, 'deleteTag'])->name('documents.deleteTag');
         Route::post('/move-tag', [DocumentController::class, 'moveTag'])->name('tags.move');
+        Route::get('/download-qr/{id}', [DocumentController::class, 'downloadQr'])->name('documents.qr.download');
     });
 
     // 4. ADMIN ROUTES
@@ -89,6 +91,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return "Check Mailtrap!";
     });
     Route::post('/profile/change-password', [App\Http\Controllers\Admin\StaffController::class, 'changeOwnPassword'])->name('profile.password.update');
+    Route::get('/document/discard/{id}', [DocumentController::class, 'discard'])->name('documents.discard');
 
 });
 
