@@ -49,9 +49,10 @@
     @endforeach
 </div>
 
-                        <a href="{{ route('dashboard') }}" class="btn btn-success w-100 fw-bold py-2 shadow-sm mb-2">
+                        <!-- Inside map.blade.php -->
+                        <button id="btn-finalize" class="btn btn-success w-100 mb-2 py-3 fw-bold">
                             DONE & FINALIZE <i class="fa fa-check-circle ms-1"></i>
-                        </a>
+                        </button>
                         <button type="button" onclick="cancelMapping(event)" class="btn btn-outline-danger w-100 fw-bold py-2 shadow-sm">
                             CANCEL & DISCARD <i class="fa fa-trash-alt ms-1"></i>
                         </button>
@@ -177,61 +178,38 @@
 @push('scripts')
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
 <script>
-    // FIX: Use an absolute URL from the root to prevent pathing issues with slashes
+    // 1. Setup Variables
     const pdfUrl = "{{ route('documents.stream', $document->id) }}";
-    let selectedUserId = null;
     const signatoriesData = @json($document->signatories); 
+    let selectedUserId = null;
 
     const pdfjsLib = window['pdfjs-dist/build/pdf'];
-    // FIX: Explicitly set the worker path
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-    // 1. Start PDF Loading
+    // 2. Load PDF
     const loadingTask = pdfjsLib.getDocument(pdfUrl);
     loadingTask.promise.then(pdf => {
         const spinner = document.getElementById('loader-spinner');
         if(spinner) spinner.remove();
-        
         document.getElementById('page-info').innerText = `Total Pages: ${pdf.numPages}`;
-        
-        for (let i = 1; i <= pdf.numPages; i++) {
-            renderPage(pdf, i);
-        }
+        for (let i = 1; i <= pdf.numPages; i++) { renderPage(pdf, i); }
 
         // Auto-select first signatory
         const firstBtn = document.querySelector('.signatory-btn');
         if(firstBtn) firstBtn.click();
-
-    }).catch(err => {
-        console.error("PDF.js Error: ", err);
-        document.getElementById('pdf-viewer-container').innerHTML = `
-            <div class="alert alert-danger mt-5 text-center">
-                <i class="fa fa-exclamation-circle fa-2x mb-2"></i>
-                <h5 class="fw-bold">Failed to load Document</h5>
-                <p class="small mb-0">${err.message}</p>
-                <div class="mt-3">
-                    <small>Troubleshooting:</small><br>
-                    <small>1. Ensure you ran <code>php artisan storage:link</code></small><br>
-                    <small>2. Verify the file exists in <code>storage/app/public/documents</code></small>
-                </div>
-            </div>`;
     });
 
     function renderPage(pdf, pageNum) {
         pdf.getPage(pageNum).then(page => {
             const scale = 1.5;
             const viewport = page.getViewport({ scale: scale });
-            
             const wrapper = document.createElement('div');
             wrapper.className = 'pdf-page-wrapper';
             wrapper.style.width = viewport.width + 'px';
             wrapper.style.height = viewport.height + 'px';
 
             const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
-
+            canvas.height = viewport.height; canvas.width = viewport.width;
             const overlay = document.createElement('div');
             overlay.className = 'marker-overlay';
             overlay.dataset.pageNum = pageNum;
@@ -239,31 +217,24 @@
             wrapper.appendChild(canvas);
             wrapper.appendChild(overlay);
             document.getElementById('pdf-viewer-container').appendChild(wrapper);
+            page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport });
 
-            page.render({ canvasContext: context, viewport: viewport });
-
-            // Load Existing Tags from DB
+            // Load Existing Tags
             signatoriesData.forEach(sig => {
                 if (sig.x_pos && parseInt(sig.page_num || 1) === pageNum) {
                     overlay.appendChild(createMarkerHtml(sig.user_id, sig.user.username, sig.x_pos, sig.y_pos));
                 }
             });
 
-            // Click Handler to Place Tag
+            // Click to place
             overlay.addEventListener('click', function(e) {
-                if (e.target.closest('.sig-marker')) return;
-                if (!selectedUserId) return alert("Select a Signatory first!");
-
-                // Clean up any existing tag for this user
+                if (e.target.closest('.sig-marker') || !selectedUserId) return;
                 document.querySelectorAll(`.sig-marker[data-user-id="${selectedUserId}"]`).forEach(el => el.remove());
-
                 const rect = overlay.getBoundingClientRect();
                 const x = ((e.clientX - rect.left) / viewport.width) * 100;
                 const y = ((e.clientY - rect.top) / viewport.height) * 100;
-
                 const userName = document.querySelector(`.signatory-btn[data-user-id="${selectedUserId}"] span`).innerText.trim();
                 overlay.appendChild(createMarkerHtml(selectedUserId, userName, x, y));
-                
                 document.getElementById(`check-${selectedUserId}`).classList.remove('d-none');
                 savePosition(selectedUserId, x, y, pageNum);
             });
@@ -272,29 +243,19 @@
 
     function createMarkerHtml(userId, name, x, y) {
         const div = document.createElement('div');
-        div.className = 'sig-marker shadow';
-        div.style.left = x + '%';
-        div.style.top = y + '%';
+        div.className = 'sig-marker shadow'; // We use .sig-marker for validation below
+        div.style.left = x + '%'; div.style.top = y + '%';
         div.dataset.userId = userId;
-        div.innerHTML = `
-            <button type="button" class="btn-delete-tag" onclick="deleteMarker(event, ${userId})"><i class="fa fa-times"></i></button>
-            <div class="text-center lh-1">
-                <div style="font-size: 0.75rem; font-weight: 800; letter-spacing: 0.5px;">SIGN HERE</div>
-                <div style="font-size: 0.6rem; opacity: 0.8; font-weight: 600;">${name}</div>
-            </div>`;
+        div.innerHTML = `<button type="button" class="btn-delete-tag" onclick="deleteMarker(event, ${userId})"><i class="fa fa-times"></i></button>
+            <div class="text-center lh-1"><div style="font-size: 0.75rem; font-weight: 800;">SIGN HERE</div><div style="font-size: 0.6rem;">${name}</div></div>`;
         return div;
     }
 
-    // Sidebar button events
+    // 3. Button Actions
     document.querySelectorAll('.signatory-btn').forEach(btn => {
         btn.addEventListener('click', function() {
-            // Remove active class from all
             document.querySelectorAll('.signatory-btn').forEach(b => b.classList.remove('active'));
-            
-            // Add to the one clicked
             this.classList.add('active');
-            
-            // Set the selected user ID for placement
             selectedUserId = this.dataset.userId;
         });
     });
@@ -318,42 +279,36 @@
         });
     };
 
+    // 4. Finalize & Cancel Logic
+    document.getElementById('btn-finalize').addEventListener('click', function() {
+        const tagsOnScreen = document.querySelectorAll('.sig-marker').length; 
+        
+        if (tagsOnScreen === 0) {
+            Swal.fire({
+                title: 'No Tags Placed!',
+                text: 'Please click on the document to place a signature tag before finalizing.',
+                icon: 'warning',
+                confirmButtonColor: '#800000'
+            });
+        } else {
+            // Trigger the back-end finalize route to change status from 'mapping' to 'pending'
+            window.location.href = "{{ url('/document/finalize/' . $document->id) }}";
+        }
+    });
+
     window.cancelMapping = function(e) {
         Swal.fire({
-            title: 'Discard Document?',
-            text: "This will permanently delete the uploaded files. You cannot undo this.",
+            title: 'GO BACK TO EDIT?',
+            text: "We will discard your current tag progress and return to the form.",
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#dc3545', // Red
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: 'Yes, discard it',
-            cancelButtonText: 'Go back'
+            confirmButtonColor: '#800000',
+            confirmButtonText: 'YES, GO BACK'
         }).then((result) => {
             if (result.isConfirmed) {
-                const btn = e.target.closest('button');
-                btn.disabled = true;
-                fetch("{{ route('documents.delete', $document->id) }}", {
-                    method: 'DELETE',
-                    headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
-                }).then(() => window.location.href = "{{ route('dashboard') }}");
+                window.location.href = "{{ url('/document/discard/' . $document->id) }}";
             }
         });
     };
-window.cancelMapping = function(e) {
-    Swal.fire({
-        title: 'GO BACK TO EDIT?',
-        text: "We will discard your current progress, but we'll save your form details so you don't have to re-type them.",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#800000',
-        confirmButtonText: 'YES, GO BACK',
-        cancelButtonText: 'STAY HERE'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            // THE CRITICAL URL: Uses url() and Numeric ID to prevent slash errors
-            window.location.href = "{{ url('/document/discard/' . $document->id) }}";
-        }
-    });
-};
 </script>
 @endpush

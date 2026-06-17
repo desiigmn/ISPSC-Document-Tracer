@@ -14,26 +14,44 @@ class UrgentDocumentAlert extends Mailable
 
     public $document;
     public $isReminder;
+    public $isResubmit;
+    public $reason;
 
     /**
      * Create a new message instance.
+     * 
+     * @param mixed $document
+     * @param bool $isResubmit - True if document was corrected and sent back
+     * @param string|null $reason - The return reason from the logs
+     * @param bool $isReminder - True if this is a follow-up nudge
      */
-    public function __construct($document, $isReminder = false)
-    {
-        $this->document = $document;
-        $this->isReminder = $isReminder;
-    }
+public $uploaderNote; // New property
+
+public function __construct($document, $isResubmit = false, $reason = null, $isReminder = false, $uploaderNote = null)
+{
+    $this->document = $document;
+    $this->isResubmit = $isResubmit;
+    $this->reason = $reason;
+    $this->isReminder = $isReminder;
+    $this->uploaderNote = $uploaderNote;
+}
 
     /**
      * Get the message envelope (Subject line logic).
      */
     public function envelope(): Envelope
     {
-        $prefix = $this->isReminder ? "[NUDGE] " : "URGENT: ";
+        // Dynamic Subject Logic
+        if ($this->isResubmit) {
+            $subject = "CORRECTED DOCUMENT: " . $this->document->tracking_id;
+        } elseif ($this->isReminder) {
+            $subject = "[NUDGE] " . $this->document->tracking_id . " - Action Required";
+        } else {
+            $subject = "URGENT: " . $this->document->tracking_id . " - Action Required";
+        }
         
         return new Envelope(
-            // FIXED: Added "$this->" before document
-            subject: $prefix . $this->document->tracking_id . " - Action Required",
+            subject: $subject,
         );
     }
 
@@ -54,4 +72,6 @@ class UrgentDocumentAlert extends Mailable
     {
         return [];
     }
+
+    
 }

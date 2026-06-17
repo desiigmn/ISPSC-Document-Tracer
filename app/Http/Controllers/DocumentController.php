@@ -27,253 +27,239 @@ class DocumentController extends Controller
     public function create()
     {
         $offices = Office::where('id', '!=', self::RECORDS_OFFICE_ID)->orderBy('office_name', 'asc')->get();
-        $users = User::with('office')->get();
+        $users = User::with('office')->select('username', 'role_title', 'office_id')->get();
         return view('documents.create', compact('offices', 'users'));
     }
 
     /**
      * STORE: Register document and handle automatic Title/ID generation
      */
-    public function store(Request $request)
-    {
-        $isHardCopy = $request->has('is_hard_copy');
+public function store(Request $request)
+{
+    $isHardCopy = $request->has('is_hard_copy');
+    $user = Auth::user();
+    $isAdminOrRecords = ($user->role === 'superadmin' || str_contains($user->office_id ?? '', '-REC-'));
 
-        // 1. Unified Validation
-        $request->validate([
-            'classification' => 'required',
-            'custom_title' => $request->classification === 'Others' ? 'required|string|max:100' : 'nullable',
-            'target_office_id' => 'required',
-            'signatory_names' => 'required|array|min:1',
-            'priority' => 'required|integer',
-            'physical_description' => $isHardCopy ? 'required|string|max:255' : 'nullable',
-            'doc_files' => $isHardCopy ? 'nullable' : 'required|array',
-            'doc_files.*' => 'required|mimes:pdf,jpg,jpeg,png|max:51200', // Set to 50MB (51200 KB)
+    $request->validate([
+        'classification' => 'required',
+        'custom_title' => $request->classification === 'Others' ? 'required|string|max:100' : 'nullable',
+        'target_office_id' => 'required',
+        'signatory_names' => 'required|array|min:1',
+        'priority' => $isAdminOrRecords ? 'required|integer|in:1,2,3' : 'nullable',
+        'physical_description' => $isHardCopy ? 'required|string|max:255' : 'nullable',
+        'doc_files' => $isHardCopy ? 'nullable' : 'required|array',
+        'doc_files.*' => 'mimes:pdf,jpg,jpeg,png|max:51200', 
+    ]);
+
+    // Check for duplicates
+    if (count($request->signatory_names) !== count(array_unique($request->signatory_names))) {
+        return back()->withInput()->with('error', 'Duplicate individuals found in the signing sequence.');
+    }
+
+    return DB::transaction(function () use ($request, $isHardCopy, $isAdminOrRecords) {
+        $title = ($isHardCopy) ? $request->physical_description : (($request->classification === 'Others') ? $request->custom_title : $request->classification);
+
+        // Logic for Initial Tracking ID
+        if ($isAdminOrRecords && $request->filled('priority')) {
+            $suffix = match((int)$request->priority) { 3 => 'EXT', 2 => 'URG', default => 'NOR' };
+        } else {
+            $suffix = 'REV';
+        }
+        $trackingId = "ISPSC-" . now()->format('m/d/Y-H:i:s') . "-" . $suffix;
+
+        // CREATE MAIN RECORD
+        // Status remains 'mapping' -> invisible to signatories
+        $document = Document::create([
+            'tracking_id' => $trackingId,
+            'title' => $title,
+            'classification' => $request->classification,
+            'status' => 'mapping', 
+            'priority' => $isAdminOrRecords ? $request->priority : null,
+            'uploader_id' => Auth::id(),
+            'is_hard_copy' => $isHardCopy,
+            'current_office_id' => Auth::user()->office_id, 
+            'target_office_id' => $request->target_office_id,
+            'file_path' => $isHardCopy ? 'PHYSICAL_ITEM' : '',
+            'current_step' => 1
         ]);
 
-        return DB::transaction(function () use ($request, $isHardCopy) {
-            
-            // 2. Automated Title Generation (Fixes "Title field doesn't have default value")
-            if ($isHardCopy) {
-                $title = $request->physical_description; 
-            } else {
-                $title = ($request->classification === 'Others') ? $request->custom_title : $request->classification;
+        // HANDLE FILES (DB entries only, no signatory dashboard yet)
+        if (!$isHardCopy && $request->hasFile('doc_files')) {
+            foreach ($request->file('doc_files') as $index => $file) {
+                $path = $file->storeAs('documents', time() . '_' . $file->getClientOriginalName(), 'public');
+                if ($index === 0) $document->update(['file_path' => $path]);
+                \App\Models\DocumentAttachment::create([
+                    'document_id' => $document->id,
+                    'file_path'   => $path,
+                    'file_name'   => $file->getClientOriginalName(),
+                    'file_type'   => $file->getMimeType()
+                ]);
             }
+        }
 
-            // 3. Determine Suffix and Generate Tracking ID
-            $suffix = match((int)$request->priority) {
-                3 => 'EXT',
-                2 => 'URG',
-                default => 'NOR',
-            };
-            $trackingId = "ISPSC-" . now()->format('m/d/Y-H:i:s') . "-" . $suffix;
-
-            // 4. Create Document Record
-            $document = Document::create([
-                'tracking_id' => $trackingId,
-                'title' => $title,
-                'classification' => $request->classification,
-                'priority' => $request->priority,
-                'status' => 'pending',
-                'uploader_id' => Auth::id(),
-                'is_hard_copy' => $isHardCopy,
-                'current_office_id' => Auth::user()->office_id, 
-                'target_office_id' => $request->target_office_id,
-                'file_path' => $isHardCopy ? 'PHYSICAL_ITEM' : '',
-                'current_step' => 1
-            ]);
-
-            // 5. Handle File Uploads (Digital only)
-            if (!$isHardCopy && $request->hasFile('doc_files')) {
-                foreach ($request->file('doc_files') as $index => $file) {
-                    $path = $file->storeAs('documents', time() . '_' . $file->getClientOriginalName(), 'public');
-                    
-                    if ($index === 0) $document->update(['file_path' => $path]);
-
-                    DocumentAttachment::create([
-                        'document_id' => $document->id,
-                        'file_path'   => $path,
-                        'file_name'   => $file->getClientOriginalName(),
-                        'file_type'   => $file->getMimeType()
-                    ]);
-                }
+        // CREATE SIGNATORIES (SILENT - No Notifications created)
+        foreach ($request->signatory_names as $index => $name) {
+            $signer = \App\Models\User::where('username', $name)->first();
+            if ($signer) {
+                \App\Models\Signatory::create([
+                    'document_id' => $document->id, 
+                    'user_id'     => $signer->id, 
+                    'sign_order'  => $index + 1, 
+                    'status'      => 'pending'
+                ]);
             }
+        }
 
-            // 6. Create Signatories & Initial Notifications
-            foreach ($request->signatory_names as $index => $name) {
-                $user = User::where('username', $name)->first();
-                if ($user) {
-                    Signatory::create([
-                        'document_id' => $document->id, 
-                        'user_id'     => $user->id, 
-                        'sign_order'  => $index + 1, 
-                        'status'      => 'pending'
-                    ]);
+        \App\Models\DocumentLog::create([
+            'document_id' => $document->id,
+            'user_id'     => Auth::id(),
+            'action'      => 'CREATED',
+            'office_id'   => Auth::user()->office_id,
+            'remarks'     => "Phase 1: Registration Complete. Document in tag-mapping state."
+        ]);
 
-                    if ($index === 0) {
-                        Notification::create([
-                            'user_id' => $user->id,
-                            'type'    => 'incoming', 
-                            'message' => "Action Required: {$document->tracking_id}",
-                            'link'    => route('documents.view', $document->id)
-                        ]);
-
-                        if ($document->priority >= 2 && !empty($user->email)) {
-                            try {
-                                Mail::to($user->email)->send(new UrgentDocumentAlert($document, false));
-                            } catch (\Exception $e) { \Log::error("Mail failed: " . $e->getMessage()); }
-                        }
-                    }
-                }
-            }
-
-            // 7. Initial Log
-            DocumentLog::create([
-                'document_id' => $document->id,
-                'user_id'     => Auth::id(),
-                'action'      => 'TIME OF HELLO',
-                'office_id'   => Auth::user()->office_id,
-                'remarks'     => $isHardCopy ? "Physical item registered: " . $title : "Digital document uploaded: " . $title
-            ]);
-
-            // 8. Final Redirect Logic
-            if ($isHardCopy) {
-                return redirect()->route('dashboard')->with('msg', 'Physical Tracking Started Successfully!');
-            }
-            
-            return redirect()->route('documents.map', $document->id)->with('msg', 'Digital Routing Started! Please place signature tags.');
-        });
-    }
+        // User moves to UI Phase 2 (Mapping)
+        return redirect()->route('documents.map', $document->id);
+    });
+}
 /**
      * SHOW: HUB
      */
-public function show($id)
+/**
+     * 5. SHOW: HUB
+     * Logic updated to support ALL campus Records Offices
+     */
+ public function show($id)
 {
+    // 1. Fetch document once with all necessary relations
     $document = Document::with(['logs.user', 'signatories.user', 'uploader'])
-                ->where('id', $id)->orWhere('tracking_id', $id)->firstOrFail();
+                ->where('id', $id)
+                ->orWhere('tracking_id', $id)
+                ->firstOrFail();
     
     $user = Auth::user();
+
+    // 2. Define Access Permissions (Master View vs. Restricted View)
+    $isSuperAdmin = ($user->role === 'superadmin');
+    $isRecordsOffice = str_contains($user->office_id ?? '', '-REC-');
+    $isUploader = ($document->uploader_id == $user->id);
+    $isSignatory = $document->signatories->contains('user_id', $user->id);
     
-    // THE CRITICAL CHECK FOR SHARED ACCESS
+    // Check if shared officially with the user's specific office
     $isDisseminatedToMe = $document->logs()
                         ->where('office_id', $user->office_id)
                         ->where('action', 'DISSEMINATED')
                         ->exists();
 
-    // Permissions check logic (Superadmin OR involved parties OR if disseminated)
-    if ($user->role !== 'superadmin' && 
-        $document->uploader_id != $user->id && 
-        !$document->signatories->contains('user_id', $user->id) && 
-        !$isDisseminatedToMe) 
-    {
-        abort(403);
+    // 3. CONSOLIDATED SECURITY GATE
+    // Only allow: Superadmins, ANY Records Staff, the Uploader, the Signatories, or Recipients
+    if (!$isSuperAdmin && !$isRecordsOffice && !$isUploader && !$isSignatory && !$isDisseminatedToMe) {
+        abort(403, "Access Denied. You do not have permission to view this tracking record.");
     }
 
-    // Generate tracking QR (for current user/document)
-    $qrCode = \SimpleSoftwareIO\QrCode\Facades\QrCode::size(150)->color(128,0,0)->generate(route('documents.view', $document->tracking_id));
+    // 4. QR Code generation (ISPSC Maroon Color)
+    $qrCode = \SimpleSoftwareIO\QrCode\Facades\QrCode::size(150)
+                ->color(128, 0, 0)
+                ->generate(route('documents.view', $document->tracking_id));
 
     return view('documents.view', compact('document', 'qrCode'));
 }
 
     /**
-     * SIGN: Apply signature/receipt and notify NEXT person immediately via email
+     * 6. SIGN: Notify NEXT person
+     * Logic updated to ensure cross-campus users trigger emails
      */
-    public function sign(Request $request, $id)
-    {
-        $document = Document::findOrFail($id);
-        $signatory = Signatory::where('document_id', $id)
-                    ->where('user_id', Auth::id())
-                    ->where('sign_order', $document->current_step)
-                    ->firstOrFail();
+ public function sign(Request $request, $id)
+{
+    $document = Document::where('id', $id)->orWhere('tracking_id', $id)->firstOrFail();
+    
+    $signatory = Signatory::where('document_id', $document->id)
+                ->where('user_id', Auth::id())
+                ->where('sign_order', $document->current_step)
+                ->firstOrFail();
 
-        return DB::transaction(function () use ($request, $document, $signatory) {
-            $signatory->update([
-                'status' => 'signed',
-                'signature_data' => $document->is_hard_copy ? 'PHYSICAL_RECEIPT' : $request->signature_data,
-                'signed_at' => now()
+    return DB::transaction(function () use ($request, $document, $signatory) {
+        $signatory->update([
+            'status' => 'signed',
+            'signature_data' => $document->is_hard_copy ? 'PHYSICAL_RECEIPT' : $request->signature_data,
+            'signed_at' => now()
+        ]);
+
+        // Find the next person in the sequence
+        $nextSigner = Signatory::with('user')->where('document_id', $document->id)
+                    ->where('sign_order', $document->current_step + 1)
+                    ->first();
+
+        if ($nextSigner) {
+            $document->update([
+                'current_step' => $document->current_step + 1,
+                'current_office_id' => $nextSigner->user->office_id
             ]);
 
-            $nextSigner = Signatory::with('user')->where('document_id', $document->id)
-                        ->where('sign_order', $document->current_step + 1)
-                        ->first();
+            // Internal Notification
+            Notification::create([
+                'user_id' => $nextSigner->user_id,
+                'type'    => 'incoming', 
+                'message' => "Incoming document for signature: {$document->tracking_id}",
+                'link'    => route('documents.view', $document->tracking_id)
+            ]);
 
-            if ($nextSigner) {
-                $document->update([
-                    'current_step' => $document->current_step + 1,
-                    'current_office_id' => $nextSigner->user->office_id
-                ]);
-
-                Notification::create([
-                    'user_id' => $nextSigner->user_id,
-                    'type'    => 'incoming', 
-                    'message' => "Incoming document: {$document->tracking_id}",
-                    'link'    => route('documents.view', $document->id)
-                ]);
-
-                // EMAIL ALERT TO NEXT SIGNER (Immediate)
-                if ($document->priority >= 2 && !empty($nextSigner->user->email)) {
-                    try {
-                        Mail::to($nextSigner->user->email)->send(new UrgentDocumentAlert($document, false));
-                    } catch (\Exception $e) { \Log::error("Next signer mail failed: " . $e->getMessage()); }
-                }
-            } else {
-                $document->update(['status' => 'accepted']);
-                Notification::create([
-                    'user_id' => $document->uploader_id,
-                    'type'    => 'finished',
-                    'message' => "Congrats! Your document is fully signed.",
-                    'link'    => route('documents.view', $document->id)
-                ]);
+            // --- FEATURE: NOTIFY NEXT SIGNER VIA EMAIL ---
+            if (!empty($nextSigner->user->email)) {
+                try {
+                    // Send email regardless of priority level to ensure sequential notification
+                    Mail::to($nextSigner->user->email)->send(new \App\Mail\UrgentDocumentAlert($document, false));
+                } catch (\Exception $e) { \Log::error("Next signer mail failed: " . $e->getMessage()); }
             }
-
-            DocumentLog::create([
-                'document_id' => $document->id,
-                'user_id' => Auth::id(),
-                'action' => $document->is_hard_copy ? 'PHYSICAL ITEM RECEIVED' : 'DIGITAL SIGNATURE APPLIED',
-                'office_id' => Auth::user()->office_id,
-                'remarks' => $document->is_hard_copy ? 'Possession confirmed.' : 'Signature applied.'
+        } else {
+            // Document is finished
+            $document->update(['status' => 'accepted']);
+            
+            Notification::create([
+                'user_id' => $document->uploader_id,
+                'type'    => 'finished',
+                'message' => "Process Finished: Document {$document->tracking_id} is now complete.",
+                'link'    => route('documents.view', $document->tracking_id)
             ]);
+        }
 
-            return response()->json(['status' => 'success']);
-        });
-    }
+        DocumentLog::create([
+            'document_id' => $document->id,
+            'user_id' => Auth::id(),
+            'action' => $document->is_hard_copy ? 'PHYSICAL ITEM RECEIVED' : 'DIGITAL SIGNATURE APPLIED',
+            'office_id' => Auth::user()->office_id,
+            'remarks' => $document->is_hard_copy ? 'Item received.' : 'Digital signature applied.'
+        ]);
 
-/**
-     * PREVIEW: Live generation with signature overlay.
-     * Accessible by involved parties OR shared offices.
-     */
+        return response()->json(['status' => 'success']);
+    });
+}
+
     public function previewWithSigs($id)
     {
-        // 1. PERFORMANCE TWEAKS
-        ini_set('memory_limit', '1024M'); // Increased for large files
+        // 1. PERFORMANCE & MEMORY OVERRIDE
+        ini_set('memory_limit', '1024M'); 
         set_time_limit(300);
 
-        // 2. FIND DOCUMENT (Numeric ID or Tracking ID)
+        // 2. FIND DOCUMENT (By Numeric ID or Tracking ID String)
         $document = Document::with(['signatories.user', 'logs'])
                     ->where('id', $id)->orWhere('tracking_id', $id)->firstOrFail();
 
         // 3. SECURITY GATE
         $user = Auth::user();
-        
-        // Logic: Is it disseminated to my office?
-        $isDisseminatedToMe = $document->logs
-            ->where('office_id', $user->office_id)
-            ->where('action', 'DISSEMINATED')
-            ->count() > 0;
-
-        // Is involved? (Signatory, Creator, or Records Office Head)
+        $isDisseminatedToMe = $document->logs->where('office_id', $user->office_id)->where('action', 'DISSEMINATED')->count() > 0;
         $isCreator = ($document->uploader_id == $user->id);
         $isSignatory = $document->signatories->contains('user_id', $user->id);
-        $isAdminOrRecords = ($user->role === 'superadmin' || str_contains($user->office_id, '-REC-'));
+        $isAdminOrRecords = ($user->role === 'superadmin' || str_contains($user->office_id ?? '', '-REC-'));
 
-        // If none of these are true, Block access
-        if (!$isAdminOrRecords && !$isCreator && !$isSignatory && !$isDisseminatedToMe) {
-            abort(403, 'Unauthorized access.');
+        if (!$isAdminOrRecords && !$isCreator && !$isSignatory && !$isDisseminatedToMe) { 
+            abort(403, "You do not have access to view this document."); 
         }
 
         // 4. GENERATE PDF WITH FPDI
         $pdf = new Fpdi();
         $filePath = storage_path('app/public/' . $document->file_path);
-        if (!file_exists($filePath)) abort(404, "Original file missing.");
+        if (!file_exists($filePath)) abort(404, "Physical file not found in storage.");
 
         $pageCount = $pdf->setSourceFile($filePath);
         for ($pageNo = 1; $pageNo <= $pageCount; $pageNo++) {
@@ -283,24 +269,46 @@ public function show($id)
             $pdf->useTemplate($templateId);
 
             foreach ($document->signatories as $sig) {
-                // Overlay signatures only if Signed and correct page
-                if ($sig->status == 'signed' && 
-                    $sig->signature_data && 
-                    $sig->signature_data !== 'PHYSICAL_RECEIPT' && 
-                    intval($sig->page_num ?? 1) == $pageNo) {
+                // Ensure coordinates exist for this person and matches current page
+                if ($sig->x_pos && $sig->y_pos && intval($sig->page_num ?? 1) == $pageNo) {
                     
-                    $imgData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $sig->signature_data));
-                    $tempPath = storage_path('app/public/temp_view_'.uniqid().'.png');
-                    file_put_contents($tempPath, $imgData);
-                    
-                    // Position calculated from 0-100 coordinates
-                    $pdf->Image($tempPath, ($sig->x_pos/100)*$size['width']-15, ($sig->y_pos/100)*$size['height']-10, 30);
-                    unlink($tempPath);
+                    // Convert percentage coordinates (0-100) to actual PDF points
+                    $x = ($sig->x_pos / 100) * $size['width'];
+                    $y = ($sig->y_pos / 100) * $size['height'];
+
+                    if ($sig->status == 'signed' && $sig->signature_data && $sig->signature_data !== 'PHYSICAL_RECEIPT') {
+                        // --- CASE A: ALREADY SIGNED - Render the actual signature ---
+                        $imgData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $sig->signature_data));
+                        $tempPath = storage_path('app/public/temp_sig_'.uniqid().'.png');
+                        file_put_contents($tempPath, $imgData);
+                        
+                        $pdf->Image($tempPath, $x - 15, $y - 10, 30);
+                        unlink($tempPath);
+                    } 
+                    elseif ($sig->status == 'pending' || $sig->status == 'returned') {
+                        // --- CASE B: PENDING - Render a "Sign Here" placeholder ---
+                        // Colors set to ISPSC Yellow/Maroon
+                        $pdf->SetFillColor(255, 204, 0); // Bright Yellow
+                        $pdf->SetDrawColor(128, 0, 0);   // Dark Maroon Border
+                        $pdf->SetLineWidth(0.4);
+                        
+                        // Draw box (width 34, height 12)
+                        $pdf->Rect($x - 17, $y - 6, 34, 12, 'DF'); 
+
+                        // Label Text for Elder Accessibility
+                        $pdf->SetTextColor(128, 0, 0); // Maroon Text
+                        $pdf->SetFont('Arial', 'B', 7);
+                        $pdf->Text($x - 15, $y - 1, "SIGN HERE"); // Upper text
+                        
+                        $pdf->SetFont('Arial', '', 5);
+                        // Show Signatory name in the box so there is no confusion
+                        $displayName = substr(strtoupper($sig->user->username), 0, 25);
+                        $pdf->Text($x - 15, $y + 3, $displayName); // Lower text
+                    }
                 }
             }
         }
         
-        // Return stream
         return response($pdf->Output('S'), 200)->header('Content-Type', 'application/pdf');
     }
 
@@ -440,29 +448,27 @@ public function resubmit(Request $request, $id)
 {
     $request->validate([
         'doc_files' => 'required|array',
-        'doc_files.*' => 'required|mimes:pdf,jpg,jpeg,png,docx,doc|max:10240'
+        'doc_files.*' => 'required|mimes:pdf,jpg,jpeg,png,docx,doc|max:51200'
     ]);
 
-    // Find document by numeric ID or Tracking ID
-    $document = Document::with('signatories')->where('id', $id)->orWhere('tracking_id', $id)->firstOrFail();
+    $document = Document::with(['signatories.user', 'logs', 'attachments'])
+                ->where('id', $id)->orWhere('tracking_id', $id)->firstOrFail();
 
     if ($document->uploader_id !== Auth::id()) abort(403);
 
     return DB::transaction(function () use ($request, $document) {
         // 1. Handle File Replacement
-        // Delete old attachments
         foreach ($document->attachments as $oldFile) {
-            Storage::disk('public')->delete($oldFile->file_path);
+            \Storage::disk('public')->delete($oldFile->file_path);
             $oldFile->delete();
         }
 
-        // Upload new files
         if ($request->hasFile('doc_files')) {
             foreach ($request->file('doc_files') as $index => $file) {
                 $path = $file->storeAs('documents', time() . '_' . $file->getClientOriginalName(), 'public');
                 if ($index === 0) $document->update(['file_path' => $path]);
 
-                DocumentAttachment::create([
+                \App\Models\DocumentAttachment::create([
                     'document_id' => $document->id,
                     'file_path' => $path,
                     'file_name' => $file->getClientOriginalName(),
@@ -471,45 +477,67 @@ public function resubmit(Request $request, $id)
             }
         }
 
-        // 2. LOGIC FIX: PRESERVE PREVIOUS SIGNATURES
-        // We only reset the status of the current person (who returned it) 
-        // and anyone further down the list.
-        $document->signatories()
-            ->where('sign_order', '>=', $document->current_step)
-            ->update([
-                'status' => 'pending',
-                'signed_at' => null
-                // Note: We do NOT clear signature_data or coordinates for previous steps
-            ]);
-
-        // 3. Set document back to pending
-        $document->update(['status' => 'pending']);
-
-        // 4. Audit Log
-        DocumentLog::create([
-            'document_id' => $document->id,
-            'user_id' => Auth::id(),
-            'action' => 'RE-SUBMITTED',
-            'office_id' => Auth::user()->office_id,
-            'remarks' => 'Corrected document uploaded. Existing valid signatures were preserved.'
+        // 2. RESET FLOW: Set back to Signer #1
+        $document->update([
+            'status' => 'pending',
+            'current_step' => 1
         ]);
 
-        return redirect()->route('documents.view', $document->tracking_id)->with('msg', 'Document resubmitted. Signatures from previous steps were kept.');
+        // 3. RESET ALL SIGNATORIES: They must all sign the new version
+        $document->signatories()->update([
+            'status' => 'pending',
+            'signed_at' => null,
+            'signature_data' => null 
+        ]);
+
+        // 4. RETRIEVE RETURN REASON: Get the last comment from the log
+        $returnLog = $document->logs()
+                    ->where('action', 'DOCUMENT RETURNED')
+                    ->latest()
+                    ->first();
+        
+        $reason = $returnLog ? $returnLog->remarks : 'Corrections requested.';
+
+        // 5. NOTIFY FIRST SIGNER VIA EMAIL
+        $firstSigner = $document->signatories->where('sign_order', 1)->first();
+        if ($firstSigner) {
+            Notification::create([
+                'user_id' => $firstSigner->user_id,
+                'type'    => 'incoming', 
+                'message' => "RESUBMITTED: Document {$document->tracking_id} has been updated. Please review corrections.",
+                'link'    => route('documents.view', $document->tracking_id)
+            ]);
+
+            if (!empty($firstSigner->user->email)) {
+                try {
+                    // We pass true for "isResubmit" and the reason to the Mailable
+                    Mail::to($firstSigner->user->email)->send(new \App\Mail\UrgentDocumentAlert($document, true, $reason));
+                } catch (\Exception $e) { \Log::error("Resubmit mail failed: " . $e->getMessage()); }
+            }
+        }
+
+        // 6. Audit Log
+        DocumentLog::create([
+            'document_id' => $document->id,
+            'user_id'     => Auth::id(),
+            'action'      => 'RE-SUBMITTED',
+            'office_id'   => Auth::user()->office_id,
+            'remarks'     => 'Corrected document uploaded. Process restarted from Signer #1.'
+        ]);
+
+        return redirect()->route('documents.view', $document->tracking_id)->with('msg', 'Document resubmitted and restarted from Signatory #1.');
     });
-    
 }
+
 public function downloadQr($id)
 {
-    // Find the document
     $document = Document::where('id', $id)->orWhere('tracking_id', $id)->firstOrFail();
     
-    // Generate as SVG (Does NOT require Imagick)
-    $qrCode = QrCode::size(500)
-        ->color(128, 0, 0) // Maroon
+    $qrCode = \SimpleSoftwareIO\QrCode\Facades\QrCode::size(500)
+        ->color(128, 0, 0)
         ->margin(1)
         ->generate(route('documents.view', $document->tracking_id));
 
-    // Return as a downloadable SVG file
     return response($qrCode)
         ->header('Content-Type', 'image/svg+xml')
         ->header('Content-Disposition', 'attachment; filename="QR_'.$document->id.'.svg"');
@@ -542,5 +570,184 @@ public function discard($id)
 
     // Redirect with "Flashing" input
     return redirect()->route('documents.create')->withInput($formData);
+}
+/**
+ * Finalize mapping: Staff moves document to the Records Office Review queue.
+ */
+public function finalizeMapping($id) 
+{
+    // Use the document instance to check tags for better code integrity
+    $document = Document::with(['signatories.user'])->findOrFail($id);
+    
+    // Safety check: Has the uploader actually dropped markers?
+    $hasTags = $document->signatories()->whereNotNull('x_pos')->exists();
+    
+    if (!$hasTags) {
+        return back()->with('error', 'Critical Error: At least one signature tag must be placed before finalizing.');
+    }
+
+    return DB::transaction(function () use ($document) {
+        
+        // Scenario A: Admin-mode Dispatch
+        if (!is_null($document->priority)) {
+            $document->update(['status' => 'pending']);
+
+            // 1st Official Sequential Notification Trigger
+            $firstSigner = $document->signatories->where('sign_order', 1)->first();
+            if ($firstSigner) {
+                // Internal Dashboard Alert
+                \App\Models\Notification::create([
+                    'user_id' => $firstSigner->user_id,
+                    'type'    => 'incoming', 
+                    'message' => "Phase 3 Dispatch: Action Required on {$document->tracking_id}",
+                    'link'    => route('documents.view', $document->tracking_id)
+                ]);
+
+                // Sequence Start Email
+                if (!empty($firstSigner->user->email)) {
+                    try {
+                        \Illuminate\Support\Facades\Mail::to($firstSigner->user->email)
+                            ->send(new \App\Mail\UrgentDocumentAlert($document, false));
+                    } catch (\Exception $e) { \Log::error("Phase 3 Initial Mail Error: " . $e->getMessage()); }
+                }
+            }
+            $msg = 'Document finalized and released to Signer #1.';
+        } 
+        
+        // Scenario B: Staff Dispatch (Review pool)
+        else {
+            $document->update(['status' => 'needs_review']);
+            $msg = 'Tags placed. Document sent to Records Office for priority validation.';
+        }
+
+        // Phase 3 Official Dispatch Log
+        \App\Models\DocumentLog::create([
+            'document_id' => $document->id,
+            'user_id'     => Auth::id(),
+            'action'      => 'FINALIZED',
+            'office_id'   => Auth::user()->office_id,
+            'remarks'     => "Phase 2 Complete: Mapping confirmed by uploader."
+        ]);
+
+        return redirect()->route('dashboard')->with('msg', $msg);
+    });
+}
+
+/**
+ * Set Priority: Records Office/Admin assigns priority and officially starts tracking.
+ */
+public function setPriority(Request $request, $id)
+{
+    $user = Auth::user();
+    if ($user->role !== 'superadmin' && !str_contains($user->office_id ?? '', '-REC-')) {
+        abort(403);
+    }
+
+    $request->validate(['priority' => 'required|integer|in:1,2,3']);
+    $document = Document::with('signatories.user')->findOrFail($id);
+
+    $suffix = match((int)$request->priority) {
+        3 => 'EXT', 2 => 'URG', default => 'NOR',
+    };
+    
+    $newTrackingId = \Illuminate\Support\Str::replaceLast('REV', $suffix, $document->tracking_id);
+
+    return DB::transaction(function () use ($request, $document, $newTrackingId) {
+        $document->update([
+            'priority' => $request->priority,
+            'tracking_id' => $newTrackingId,
+            'status' => 'pending'
+        ]);
+
+        // --- FEATURE: NOTIFY FIRST SIGNER VIA EMAIL ---
+        $firstSigner = $document->signatories->where('sign_order', 1)->first();
+        if ($firstSigner) {
+            // Internal Notification
+            Notification::create([
+                'user_id' => $firstSigner->user_id,
+                'type'    => 'incoming', 
+                'message' => "Action Required: Document {$document->tracking_id} assigned priority.",
+                'link'    => route('documents.view', $document->tracking_id)
+            ]);
+
+            // Email Notification
+            if (!empty($firstSigner->user->email)) {
+                try {
+                    Mail::to($firstSigner->user->email)->send(new \App\Mail\UrgentDocumentAlert($document, false));
+                } catch (\Exception $e) { \Log::error("First signer mail failed: " . $e->getMessage()); }
+            }
+        }
+
+        DocumentLog::create([
+            'document_id' => $document->id,
+            'user_id'     => Auth::id(),
+            'action'      => 'PRIORITY ASSIGNED',
+            'office_id'   => Auth::user()->office_id,
+            'remarks'     => "Priority set to level " . $request->priority . ". Tracking started."
+        ]);
+
+        return redirect()->route('dashboard')->with('msg', 'Priority assigned and first signer notified.');
+    });
+}
+/**
+ * REVALIDATE: Creator disagrees with return reason and sends it back to that specific signer.
+ */
+public function revalidate(Request $request, $id)
+{
+    $request->validate(['explanation' => 'required|string|max:1000']);
+
+    $document = Document::with(['signatories.user', 'logs'])
+                ->where('id', $id)->orWhere('tracking_id', $id)->firstOrFail();
+
+    if ($document->uploader_id !== Auth::id()) abort(403);
+
+    return DB::transaction(function () use ($request, $document) {
+        // Define the variable locally from the request
+        $explanation = $request->explanation;
+
+        // 1. Set status back to pending
+        $document->update(['status' => 'pending']);
+
+        // 2. Identify the signatory who currently needs to sign
+        $currentSigner = $document->signatories->where('sign_order', $document->current_step)->first();
+
+        if ($currentSigner) {
+            // Internal Notification
+            Notification::create([
+                'user_id' => $currentSigner->user_id,
+                'type'    => 'incoming', 
+                'message' => "RE-VALIDATED: Creator maintained original file for {$document->tracking_id}.",
+                'link'    => route('documents.view', $document->tracking_id)
+            ]);
+
+            // Email Notification
+            if (!empty($currentSigner->user->email)) {
+                try {
+                    // FIXED: Used $currentSigner instead of $signer
+                    // FIXED: $explanation is now defined above
+                    Mail::to($currentSigner->user->email)->send(new \App\Mail\UrgentDocumentAlert(
+                        $document, 
+                        false,         // $isResubmit
+                        null,          // $reason
+                        false,         // $isReminder
+                        $explanation   // $uploaderNote
+                    ));
+                } catch (\Exception $e) { 
+                    \Log::error("Revalidate mail failed: " . $e->getMessage()); 
+                }
+            }
+        }
+
+        // 3. Audit Log
+        DocumentLog::create([
+            'document_id' => $document->id,
+            'user_id'     => Auth::id(),
+            'action'      => 'RE-VALIDATED',
+            'office_id'   => Auth::user()->office_id,
+            'remarks'     => "CREATOR EXPLANATION: " . $explanation
+        ]);
+
+        return redirect()->route('documents.view', $document->tracking_id)->with('msg', 'Explanation sent back to the signatory.');
+    });
 }
 }

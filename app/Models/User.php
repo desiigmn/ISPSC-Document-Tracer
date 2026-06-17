@@ -25,6 +25,7 @@ class User extends Authenticatable
     'role',     // Ensure this is here
     'campus_code', // Ensure this is here
     'office_id', // Ensure this is here
+    'role_title', // Ensure this is here
 ];
 
     /**

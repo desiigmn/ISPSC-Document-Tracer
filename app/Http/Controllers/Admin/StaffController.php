@@ -36,11 +36,12 @@ public function store(Request $request)
         'email'       => $request->email,
         'password'    => \Illuminate\Support\Facades\Hash::make($request->password),
         'office_id'   => $request->office_id,
+        'role'        => $request->role,
         'campus_code' => $request->campus_code,
-        'role'        => $request->role, // Uses the selected role
+        'role_title'  => $request->role_title, // <-- Add this if you added a role_title input to the register form
     ]);
 
-    return back()->with('msg', 'Account created successfully!');
+    return back()->with('msg', 'User registered!');
 }
 public function resetPassword(Request $request, $id)
 {

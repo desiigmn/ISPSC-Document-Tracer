@@ -46,13 +46,6 @@
                 SIGN IN <i class="fa fa-sign-in-alt ms-2"></i>
             </button>
 
-            @if (Route::has('password.request'))
-                <div class="text-center mt-3">
-                    <a href="{{ route('password.request') }}" class="text-decoration-none small text-maroon fw-bold">
-                        Forgot your password?
-                    </a>
-                </div>
-            @endif
         </form>
     </div>
 @endsection

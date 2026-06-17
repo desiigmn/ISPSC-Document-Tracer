@@ -77,7 +77,7 @@
                 <i class="fa fa-shield-halved fa-3x"></i>
             </div>
 
-            <h2 class="fw-bold text-dark mb-3">Security Restriction</h2>
+            <h2 class="fw-bold text-dark mb-3">Document Not Available For You</h2>
             
             <p class="text-muted mb-4 px-3">
                 Sorry, <span class="fw-bold text-dark">{{ Auth::user()->username }}</span>. <br>
@@ -86,7 +86,7 @@
 
             <div class="alert alert-light border-0 small text-start mb-4" style="background-color: #fdfdfd; color: #666;">
                 <i class="fa fa-info-circle me-2 text-maroon"></i> 
-                Only the <strong>Creator</strong>, <strong>Assigned Signatories</strong>, or the <strong>Records Office</strong> can access this cycle.
+                Only the <strong>Creator</strong>, <strong>Assigned Signatories</strong>, and the <strong>Records Office</strong> can access this cycle. Unless you are one of these, you will not be able to view or sign this document.
             </div>
 
             <div class="d-grid gap-2">

@@ -1,97 +1,105 @@
-<div class="table-responsive">
-    <table class="table align-middle table-hover mb-0">
+<div class="table-responsive bg-white">
+    <table class="table align-middle table-hover mb-0 border-0">
         <thead class="bg-light">
-            <tr class="text-muted text-uppercase small fw-bold">
-                <th class="ps-4">Tracking ID</th>
-                <th>Description</th>
-                @if($showRecipients)
-                    <th>Recipient Offices</th>
-                @else
-                    <th>Creator</th>
-                @endif
-                <th>Final Location</th>
-                <th>Status</th> <!-- RE-ADDED HEADER -->
-                <th class="text-center">Action</th>
+            <tr class="small text-muted border-bottom fw-black">
+                <th class="ps-5 py-3">TRACKING ID</th>
+                <th>DESCRIPTION / URGENCY</th>
+                <th>CREATOR</th> <!-- NEW COLUMN -->
+                <th>PROCESS STATUS</th>
+                <th>LOCATION</th>
+                <th class="text-center">ACTION</th>
             </tr>
         </thead>
         <tbody>
             @foreach($tableDocs as $doc)
-            <tr>
-                <!-- 1. TRACKING ID -->
-                <td class="ps-4">
-                    <span class="text-maroon fw-bold font-monospace small">{{ $doc->tracking_id }}</span>
-                </td>
-
-                <!-- 2. DESCRIPTION -->
-                <td>
-                    <div class="fw-bold text-dark">{{ explode(' - ', $doc->title)[0] }}</div>
-                    @if($doc->priority == 3 && $doc->status != 'accepted')
-                        <small class="text-danger fw-bold animate__animated animate__flash animate__infinite">
-                            <i class="fa fa-bolt"></i> EXTREMELY URGENT
-                        </small>
-                    @elseif($doc->priority == 2 && $doc->status != 'accepted')
-                        <small class="text-warning fw-bold">URGENT</small>
-                    @endif
-                </td>
-                
-                <!-- 3. PERSONNEL/RECIPIENTS -->
-                @if($showRecipients)
+                @php
+                    $isSharedToMe = $doc->logs->where('office_id', Auth::user()->office_id)->where('action', 'DISSEMINATED')->count() > 0;
+                    
+                    if ($isSharedToMe) { 
+                        $statusClass = 'table-row-shared';
+                        $label = "OFFICIAL COPY (SHARED)";
+                    } elseif ($doc->status == 'accepted') {
+                        $statusClass = 'table-row-finished';
+                        $label = "FINISHED TRANSACTION";
+                    } elseif ($doc->priority == 3) {
+                        $statusClass = 'table-row-extremely-urgent';
+                        $label = "EXTREMELY URGENT";
+                    } elseif ($doc->priority == 2) {
+                        $statusClass = 'table-row-urgent';
+                        $label = "URGENT";
+                    } elseif ($doc->priority == 1) {
+                        $statusClass = 'table-row-normal';
+                        $label = "NORMAL PRIORITY";
+                    } else {
+                        $statusClass = 'table-row-mapping';
+                        $label = "PREPARING TAGS";
+                    }
+                @endphp
+                <tr class="{{ $statusClass }} shadow-sm mb-1" style="height: 90px;">
+                    <td class="ps-5">
+                        <small class="d-block text-muted mb-1">{{ $doc->created_at->format('M d, Y') }}</small>
+                        <span class="font-monospace fw-black text-dark fs-6">{{ $doc->tracking_id }}</span>
+                    </td>
+                    
                     <td>
-                        @php
-                            $recipients = $doc->logs->where('action', 'DISSEMINATED')->pluck('office_id')->unique();
-                        @endphp
-                        @foreach($recipients as $officeId)
-                            @php $off = \App\Models\Office::find($officeId); @endphp
-                            <span class="badge bg-light text-primary border mb-1" style="font-size: 0.65rem;">
-                                <i class="fa fa-building me-1"></i> {{ $off->office_name ?? $officeId }}
-                            </span>
-                        @endforeach
-                    </td>
-                @else
-                <td>
-                    <div class="fw-bold small text-dark text-uppercase">
-                        {{ $doc->uploader->username }}
-                    </div>
-                </td>
-                @endif
-
-                <!-- 4. FINAL LOCATION -->
-                <td>
-                    <div class="d-flex align-items-center">
-                        <i class="fa fa-building text-muted me-2 small"></i>
-                        <span class="small fw-bold text-muted text-uppercase">
-                            {{ $doc->targetOffice->office_name ?? 'N/A' }}
+                        <div class="fw-black text-maroon text-uppercase ls-n1">{{ $doc->title }}</div>
+                        <span class="badge py-2 px-3 rounded-pill mt-1" 
+                              style="background: #f8f9fa; color: #444; border: 1px solid #ddd; font-size: 0.65rem;">
+                              <i class="fa fa-shield-halved me-1 text-maroon"></i> {{ $label }}
                         </span>
-                    </div>
-                </td>
-
-                <!-- 5. STATUS (RE-ADDED DATA) -->
-                <td>
-                    @php 
-                        $isPending = ($doc->status == 'pending' || $doc->status == 'returned'); 
-                        $statusText = ($doc->status == 'accepted') ? 'FINISHED' : (($doc->status == 'returned') ? 'RETURNED' : 'IN TRANSIT');
-                        $statusColor = ($doc->status == 'accepted') ? '#198754' : (($doc->status == 'returned') ? '#dc3545' : '#800000');
-                    @endphp
-                    <span class="badge w-100 py-2 fs-6" style="background-color: {{ $statusColor }};">
-                        {{ $statusText }}
-                    </span>
-                </td>
-
-                <!-- 6. ACTION -->
-                    <td class="text-center">
-                        @php 
-                            // Fallback to Maroon if $color is somehow missing
-                            $btnColor = $color ?? '#800000'; 
-                        @endphp
-                        <a href="{{ route('documents.view', $doc->tracking_id) }}" 
-                        class="btn btn-sm px-4 rounded-pill fw-bold shadow-sm"
-                        style="border: 2px solid {{ $btnColor }}; color: {{ $btnColor }}; background: transparent;"
-                        onmouseover="this.style.backgroundColor='{{ $btnColor }}'; this.style.color='white'"
-                        onmouseout="this.style.backgroundColor='transparent'; this.style.color='{{ $btnColor }}'">
-                            VIEW
-                        </a>
                     </td>
-            </tr>
+
+                    {{-- NEW DATA: THE CREATOR SECTION --}}
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <div class="bg-maroon bg-opacity-10 text-maroon rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 32px; height: 32px;">
+                                <i class="fa fa-user-pen" style="font-size: 0.8rem;"></i>
+                            </div>
+                            <div class="lh-1">
+                                <div class="fw-bold text-dark small">{{ $doc->uploader->username }}</div>
+                                <small class="text-muted" style="font-size: 0.65rem;">{{ strtoupper($doc->uploader->office->office_name ?? 'STAFF') }}</small>
+                            </div>
+                        </div>
+                    </td>
+
+                    <td>
+                        <div class="small text-muted mb-1 fw-bold">CURRENTLY AT</div>
+                        <div class="small fw-bold">
+                            @php 
+                                $curr = $doc->signatories->where('sign_order', $doc->current_step)->first(); 
+                            @endphp
+                            @if($doc->status == 'accepted')
+                                <i class="fa fa-check-double text-success"></i> COMPLETED
+                            @elseif($doc->status == 'mapping')
+                                <i class="fa fa-edit text-primary"></i> Tag Placement
+                            @elseif($doc->status == 'needs_review')
+                                <i class="fa fa-magnifying-glass text-warning"></i> Records Review
+                            @else
+                                <div class="d-flex align-items-center">
+                                    <i class="fa fa-user-circle text-muted me-1"></i> 
+                                    <span class="text-truncate" style="max-width: 150px;">{{ $curr->user->username ?? 'Next Signatory' }}</span>
+                                </div>
+                            @endif
+                        </div>
+                    </td>
+
+                    <td>
+                        <div class="d-flex align-items-center text-muted">
+                            <i class="fa fa-location-arrow me-2 opacity-50"></i>
+                            <span class="small fw-bold text-truncate" style="max-width: 180px;">
+                                {{ $doc->targetOffice->office_name ?? 'Archive' }}
+                            </span>
+                        </div>
+                    </td>
+
+                    <td class="text-center pe-4">
+                        @if($doc->status == 'mapping')
+                            <a href="{{ route('documents.map', $doc->id) }}" class="btn btn-outline-info rounded-pill fw-black px-4 shadow-sm border-2">RESUME</a>
+                        @else
+                            <a href="{{ route('documents.view', $doc->tracking_id) }}" class="btn btn-outline-dark rounded-pill fw-black px-4 shadow-sm border-2">VIEW</a>
+                        @endif
+                    </td>
+                </tr>
             @endforeach
         </tbody>
     </table>
