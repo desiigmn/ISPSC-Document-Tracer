@@ -6,7 +6,7 @@
 @php
     $user = Auth::user();
     
-    // Core Security & Role Logic
+    // Core Logic (UNCHANGED)
     $isAdminOrRecords = ($user->role === 'superadmin' || str_contains($user->office_id ?? '', '-REC-'));
     $userSig = $document->signatories->where('user_id', $user->id)->first();
     
@@ -17,8 +17,6 @@
     
     $isActuallyPhysical = ($document->is_hard_copy == 1 || $document->file_path == 'PHYSICAL_ITEM' || empty($document->file_path));
 
-    // --- FIX FOR THE ERROR START ---
-    // Fetch the latest explanation if this was maintained as original by the creator
     $revalidationLog = $document->logs
         ->where('action', 'RE-VALIDATED')
         ->sortByDesc('created_at')
@@ -26,216 +24,173 @@
 
     $uploaderExplanation = null;
     if ($revalidationLog) {
-        // Strip prefix if you used it in the controller, otherwise just show remarks
         $uploaderExplanation = str_replace('CREATOR EXPLANATION: ', '', $revalidationLog->remarks);
     }
-    // --- FIX FOR THE ERROR END ---
 @endphp
 
 <style>
-    #sig-canvas { touch-action: none; cursor: crosshair; background-color: #ffffff; }
-    .view-wrapper-fluid { width: 100% !important; max-width: 100% !important; padding: 0 15px; }
+    :root { 
+        --ispsc-maroon: #800000; 
+        --ispsc-yellow: #FFCC00;
+        --ispsc-blue: #0056b3;
+    }
 
-    /* TIMELINE STYLING */
-    .journey-v-timeline { position: relative; padding-left: 50px; margin-top: 15px; }
-    .journey-v-timeline::before {
-        content: ''; position: absolute; left: 23px; top: 0; bottom: 0;
-        width: 2px; background: #dee2e6; z-index: 1;
+    body { font-size: 13px; color: #333; }
+    .view-wrapper-fluid { width: 100%; padding: 0 40px; }
+
+    /* Theme-aligned Cards */
+    .tracer-card { 
+        background: #fff; border: 1px solid #e1e8ed; border-radius: 12px; 
+        margin-bottom: 25px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); overflow: hidden; 
     }
-    .j-item { position: relative; margin-bottom: 30px; z-index: 2; }
-    .j-icon {
-        position: absolute; left: -43px; width: 36px; height: 36px;
-        background: #fff; border: 3px solid #dee2e6; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 14px; color: #adb5bd; transition: all 0.3s ease;
+    .tracer-card-header { 
+        padding: 15px 25px; border-bottom: 1px solid #f1f1f1; 
+        display: flex; justify-content: space-between; align-items: center; background: #fff; 
     }
-    .j-item.completed .j-icon { background: #800000; border-color: #800000; color: #fff; }
-    .j-item.active .j-icon { 
-        background: #ffc107; border-color: #800000; color: #000; 
-        box-shadow: 0 0 10px rgba(255,193,7,0.5); 
-    }
-    .j-item.returned .j-icon { background: #dc3545; border-color: #dc3545; color: #fff; }
+    .tracer-card-header h6 { margin: 0; font-weight: 800; color: #000; text-transform: uppercase; font-size: 13px; }
+
+    /* Timeline Styling */
+    .timeline-wrapper { overflow-x: auto; padding: 10px 0; -webkit-overflow-scrolling: touch; }
+    .h-timeline { display: flex; justify-content: space-between; position: relative; margin: 20px 0; padding: 0 10px; min-width: 600px; }
+    .h-timeline::before { content: ''; position: absolute; top: 15px; left: 0; right: 0; height: 2px; background: #e1e8ed; z-index: 1; }
+    .t-node { position: relative; z-index: 2; text-align: center; width: 100%; }
+    .t-dot { width: 30px; height: 30px; background: #fff; border: 3px solid #e1e8ed; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 10px; }
+    .t-node.active .t-dot { border-color: var(--ispsc-maroon); background: var(--ispsc-maroon); color: #fff; }
+    .t-node.completed .t-dot { border-color: var(--ispsc-blue); background: var(--ispsc-blue); color: #fff; }
+    .t-node.returned .t-dot { border-color: #dc3545; background: #dc3545; color: #fff; }
+    .t-label { font-size: 11px; font-weight: 800; display: block; color: #333; text-transform: uppercase; }
+
+    /* Typography & Buttons */
+    .tracking-id-text { font-family: monospace; font-weight: 900; color: var(--ispsc-maroon); font-size: 1.5rem; }
+    .btn-docu { border-radius: 8px; font-weight: 800; text-transform: uppercase; font-size: 12px; padding: 10px 20px; transition: 0.3s; border: none; }
+    .btn-maroon { background: var(--ispsc-maroon); color: #fff; }
+    .btn-maroon:hover { background: #600000; transform: translateY(-2px); }
+    .btn-dark { background: #111; color: #fff; }
     
-    .text-maroon { color: #800000 !important; }
-    .bg-maroon { background-color: #800000 !important; color: white !important; }
+    #sig-canvas { touch-action: none; cursor: crosshair; background-color: #ffffff; border: 2px solid #e1e8ed; border-radius: 8px; }
     .bg-pro-grey { background-color: #525659; }
-    .letter-spacing-1 { letter-spacing: 1px; }
+
+    /* MODAL BOUNDARY & TABLE FIXES */
+    @media (min-width: 1200px) {
+        .modal, .modal-backdrop { 
+            left: var(--sidebar-width) !important; 
+            width: calc(100% - var(--sidebar-width)) !important; 
+        }
+    }
+    .audit-table { table-layout: fixed; min-width: 800px !important; }
+    .audit-table td { 
+        white-space: normal !important; 
+        word-wrap: break-word !important; 
+        overflow-wrap: break-word !important;
+        vertical-align: top;
+        padding: 15px 10px !important;
+    }
+
+    @media (max-width: 768px) { .view-wrapper-fluid { padding: 0 15px; } }
 </style>
 
-<div class="view-wrapper-fluid py-3 animate__animated animate__fadeIn">   
+<div class="view-wrapper-fluid py-4 animate__animated animate__fadeIn">   
     
     <!-- SECTION 1: TOP STATUS BAR -->
-    <div class="card border-0 shadow-sm rounded-3 mb-3 overflow-hidden">
+    <div class="tracer-card mb-4">
         <div class="card-body p-0">
             <div class="row g-0 align-items-center">
-                <div class="col-md-auto bg-white p-3 border-end px-4 text-center">
-                    <span class="text-muted small fw-bold text-uppercase d-block mb-1">Status</span>
+                <div class="col-md-auto p-4 border-end text-center" style="min-width: 180px;">
+                    <span class="text-muted small fw-bold text-uppercase d-block mb-1">State</span>
                     @php
                         $statusColor = match($document->status) {
-                            'accepted' => '#198754',
-                            'returned' => '#dc3545',
-                            'pending' => '#ffc107',
-                            'needs_review' => '#0d6efd',
-                            default => '#6c757d'
+                            'accepted' => '#e6f4ea', 'returned' => '#fdf2f2', 'pending' => '#fff4e5', 'needs_review' => '#e7f1ff', default => '#f3f4f6'
                         };
-                        $displayText = ($document->status == 'needs_review') ? 'FOR REVIEW' : $document->status;
+                        $textColor = match($document->status) {
+                            'accepted' => '#1e7e34', 'returned' => '#dc3545', 'pending' => '#d97706', 'needs_review' => '#0d6efd', default => '#374151'
+                        };
                     @endphp
-                    <span class="badge px-4 py-2" style="background-color: {{ $statusColor }}; color: {{ ($document->status == 'pending' || $document->status == 'needs_review') ? '#000' : '#fff' }}; border-radius: 50px; font-size: 0.9rem; font-weight: 800;">
-                        {{ strtoupper($displayText) }}
+                    <span class="badge px-3 py-2" style="background-color: {{ $statusColor }}; color: {{ $textColor }}; border-radius: 6px; font-weight: 900; font-size: 12px;">
+                        {{ strtoupper($document->status == 'needs_review' ? 'FOR REVIEW' : $document->status) }}
                     </span>
                 </div>
-                <div class="col p-3 px-4 bg-light bg-opacity-50">
+                <div class="col p-4 bg-light bg-opacity-50">
                     <span class="text-muted small fw-bold text-uppercase d-block mb-1">Global Tracking ID</span>
-                    <span class="text-maroon fw-bold font-monospace fs-4">{{ $document->tracking_id }}</span>
+                    <span class="tracking-id-text">{{ $document->tracking_id }}</span>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="row g-3">
-        <!-- SECTION 2: LEFT SIDEBAR (Creator & Journey) -->
-        <div class="col-xl-3 col-lg-4">
-            <!-- Creator Info -->
-            <div class="card shadow-sm border-0 rounded-3 mb-3">
-                <div class="card-header bg-maroon py-2 text-center text-white">
-                    <h6 class="mb-0 small fw-bold text-uppercase">Document Creator</h6>
-                </div>
-                <div class="card-body p-3">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="bg-maroon bg-opacity-10 text-maroon rounded-circle d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;">
-                            <i class="fa fa-user-tie fs-5"></i>
-                        </div>
-                        <div class="ms-3">
-                            <h6 class="mb-0 fw-bold text-dark">{{ $document->uploader->username }}</h6>
-                            <small class="text-muted">{{ $document->uploader->office->office_name ?? 'RECORDS' }}</small>
-                        </div>
-                    </div>
-                    <div class="mt-3 d-grid gap-2">
-                        <button class="btn btn-dark btn-sm fw-bold py-2" data-bs-toggle="modal" data-bs-target="#trailModal"><i class="fa fa-history me-1"></i> VIEW AUDIT TRAIL</button>
-                        <button class="btn btn-outline-dark btn-sm fw-bold py-2" data-bs-toggle="modal" data-bs-target="#qrModal"><i class="fa fa-qrcode me-1"></i> TRACKING QR CODE</button>
-                        
-                        @if($document->status == 'accepted' && $isAdminOrRecords)
-                            <button class="btn btn-maroon btn-sm fw-bold py-2" data-bs-toggle="modal" data-bs-target="#disseminateModal">
-                                <i class="fa fa-share-nodes me-1"></i> SHARE OFFICIAL COPIES
-                            </button>
-                        @endif
-                    </div>
-                </div>
-            </div>
-
-            <!-- Timeline -->
-            <div class="card shadow-sm border-0 rounded-3">
-                <div class="card-header bg-white border-bottom py-2">
-                    <h6 class="fw-bold mb-0 text-dark small text-uppercase">Journey Status</h6>
-                </div>
-                <div class="card-body p-3">
-                    <div class="journey-v-timeline">
-                        <div class="j-item completed">
-                            <div class="j-icon"><i class="fa fa-door-open"></i></div>
-                            <div class="j-content">
-                                <p class="fw-bold mb-0 small text-uppercase">Document Created</p>
-                                <small class="text-muted">{{ $document->created_at->format('M d, Y h:i A') }}</small>
-                            </div>
-                        </div>
-
-                        @foreach($document->signatories->sortBy('sign_order') as $sig)
-                            @php
-                                $isDone = ($sig->status == 'signed');
-                                $isCurrent = ($document->current_step == $sig->sign_order && $document->status == 'pending');
-                                $isReturned = ($document->current_step == $sig->sign_order && $document->status == 'returned');
-                                $itemClass = $isDone ? 'completed' : ($isReturned ? 'returned' : ($isCurrent ? 'active' : ''));
-                            @endphp
-                            <div class="j-item {{ $itemClass }}">
-                                <div class="j-icon"><i class="fa {{ $isDone ? 'fa-check' : ($isReturned ? 'fa-rotate-left' : ($isCurrent ? 'fa-spinner fa-spin' : 'fa-circle')) }}"></i></div>
-                                <div class="j-content">
-                                    <p class="fw-bold mb-0 small text-uppercase {{ $isCurrent ? 'text-maroon' : 'text-dark' }}">{{ $sig->user->username }}</p>
-                                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.6rem;">
-                                        <i class="fa fa-id-badge me-1"></i> {{ strtoupper($sig->user->role_title ?? 'Authorized Personnel') }}
-                                    </small>
-
-                                    @if($isDone)
-                                        <small class="text-success d-block fw-bold" style="font-size: 0.65rem;">SIGNED: {{ \Carbon\Carbon::parse($sig->signed_at)->format('M d, H:i') }}</small>
-                                    @elseif($isCurrent)
-                                        <small class="text-primary fw-bold" style="font-size: 0.65rem;">AWAITING ACTION</small>
-                                    @endif
-                                </div>
-                            </div>
-                        @endforeach
-
-                        <div class="j-item {{ $document->status == 'accepted' ? 'completed' : '' }}">
-                            <div class="j-icon"><i class="fa fa-flag-checkered"></i></div>
-                            <div class="j-content"><p class="fw-bold mb-0 small text-uppercase">Process Finished</p></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- SECTION 3: RIGHT CONTENT AREA (Viewer & Actions) -->
-        <div class="col-xl-9 col-lg-8">
+    <div class="row g-4">
+        <!-- LEFT COLUMN -->
+        <div class="col-lg-8">
             
-            {{-- 3A. PRIORITY ASSIGNMENT (ADMIN/RECORDS ONLY) --}}
-            @if($document->status == 'needs_review' && $isAdminOrRecords)
-                <div class="card border-primary shadow-sm mb-3 overflow-hidden">
-                    <div class="card-header bg-primary text-white py-2">
-                        <h6 class="mb-0 fw-bold small text-uppercase"><i class="fa fa-tasks me-2"></i> Action Required: Priority Assignment</h6>
+            <!-- SECTION 2: TIMELINE -->
+            <div class="tracer-card">
+                <div class="tracer-card-header"><h6>Movement Timeline</h6></div>
+                <div class="card-body px-4">
+                    <div class="timeline-wrapper">
+                        <div class="h-timeline">
+                            <div class="t-node completed">
+                                <div class="t-dot"><i class="fa fa-door-open"></i></div>
+                                <span class="t-label">Origin</span>
+                            </div>
+                            @foreach($document->signatories->sortBy('sign_order') as $sig)
+                                @php
+                                    $isDone = ($sig->status == 'signed');
+                                    $isCurrent = ($document->current_step == $sig->sign_order && $document->status == 'pending');
+                                    $isRet = ($document->current_step == $sig->sign_order && $document->status == 'returned');
+                                    $state = $isDone ? 'completed' : ($isRet ? 'returned' : ($isCurrent ? 'active' : ''));
+                                @endphp
+                                <div class="t-node {{ $state }}">
+                                    <div class="t-dot"><i class="fa {{ $isDone ? 'fa-check' : ($isRet ? 'fa-undo' : ($isCurrent ? 'fa-spinner fa-spin' : 'fa-circle')) }}"></i></div>
+                                    <span class="t-label text-truncate d-block px-2">{{ $sig->user->username }}</span>
+                                </div>
+                            @endforeach
+                            <div class="t-node {{ $document->status == 'accepted' ? 'completed' : '' }}">
+                                <div class="t-dot"><i class="fa fa-flag-checkered"></i></div>
+                                <span class="t-label">Final</span>
+                            </div>
+                        </div>
                     </div>
+                </div>
+            </div>
+
+            {{-- 3A. PRIORITY ASSIGNMENT (FOR RECORDS) --}}
+            @if($document->status == 'needs_review' && $isAdminOrRecords)
+                <div class="tracer-card border-primary">
                     <div class="card-body bg-light p-4">
-                        <p class="mb-3 text-dark">Document ready for sequence. Please assign the appropriate priority level.</p>
-                        <form action="{{ route('documents.setPriority', $document->id) }}" method="POST" class="row g-3 align-items-center">
+                        <h6 class="fw-black text-primary mb-3">ACTION REQUIRED: SET PRIORITY</h6>
+                        <form action="{{ route('documents.setPriority', $document->id) }}" method="POST" class="row g-3">
                             @csrf
-                            <div class="col-md-6">
-                                <select name="priority" class="form-select border-primary fw-bold" required>
-                                    <option value="" selected disabled>Select priority...</option>
-                                    <option value="1">Normal (NOR)</option>
-                                    <option value="2">Urgent (URG)</option>
-                                    <option value="3">Extremely Urgent (EXT)</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <button type="submit" class="btn btn-primary w-100 fw-black">CONFIRM & COMMENCE TRACKING <i class="fa fa-arrow-right ms-2"></i></button>
-                            </div>
+                            <div class="col-md-8"><select name="priority" class="form-select fw-bold" required><option value="1">Normal</option><option value="2">Urgent</option><option value="3">Extremely Urgent</option></select></div>
+                            <div class="col-md-4"><button type="submit" class="btn btn-primary btn-docu w-100">Confirm & Start</button></div>
                         </form>
                     </div>
                 </div>
             @endif
 
-            {{-- 3B. RETURN HANDLING (CREATOR ONLY) --}}
+            {{-- 3B. RETURN HANDLING (FOR CREATOR) --}}
             @if($document->status == 'returned' && $document->uploader_id == Auth::id())
-                <div class="card border-danger shadow-sm mb-3 overflow-hidden">
-                    <div class="card-header bg-danger text-white py-2">
-                        <h6 class="mb-0 fw-bold small text-uppercase">Correction Required</h6>
-                    </div>
+                <div class="tracer-card border-danger">
                     <div class="card-body p-4">
-                        <div class="alert alert-light border mb-4">
-                            <h6 class="fw-bold text-danger">Return Reason:</h6>
-                            <p class="mb-0 italic text-dark">"{{ $document->logs->where('action', 'DOCUMENT RETURNED')->last()->remarks ?? 'N/A' }}"</p>
+                        <div class="alert alert-danger bg-opacity-10 border-0 mb-4 p-3">
+                            <h6 class="fw-black text-danger text-uppercase small mb-1">Correction Required:</h6>
+                            <p class="mb-0 italic">"{{ $document->logs->where('action', 'DOCUMENT RETURNED')->last()->remarks ?? 'N/A' }}"</p>
                         </div>
-
-                        <ul class="nav nav-tabs mb-3" id="returnTabs" role="tablist">
-                            <li class="nav-item">
-                                <button class="nav-link active fw-bold text-dark" data-bs-toggle="tab" data-bs-target="#uploadTab">RE-UPLOAD REVISED</button>
-                            </li>
-                            <li class="nav-item">
-                                <button class="nav-link fw-bold text-dark" data-bs-toggle="tab" data-bs-target="#disputeTab">MAINTAIN ORIGINAL</button>
-                            </li>
+                        <ul class="nav nav-pills mb-4 gap-2" role="tablist">
+                            <li class="nav-item"><button class="btn btn-outline-danger btn-docu active" data-bs-toggle="tab" data-bs-target="#uploadTab">Re-upload Revised</button></li>
+                            <li class="nav-item"><button class="btn btn-outline-dark btn-docu" data-bs-toggle="tab" data-bs-target="#disputeTab">Maintain Original</button></li>
                         </ul>
-
-                        <div class="tab-content border p-3 rounded bg-white">
+                        <div class="tab-content pt-2">
                             <div class="tab-pane fade show active" id="uploadTab">
                                 <form action="{{ route('documents.resubmit', $document->tracking_id) }}" method="POST" enctype="multipart/form-data">
                                     @csrf
-                                    <label class="form-label small fw-bold">Attach New File(s):</label>
                                     <input type="file" name="doc_files[]" class="form-control mb-3" required multiple>
-                                    <button type="submit" class="btn btn-danger w-100 fw-bold">RESUBMIT & RESTART SEQUENCE</button>
+                                    <button type="submit" class="btn btn-danger btn-docu w-100">Resubmit & Restart Sequence</button>
                                 </form>
                             </div>
                             <div class="tab-pane fade" id="disputeTab">
                                 <form action="{{ route('documents.revalidate', $document->tracking_id) }}" method="POST">
                                     @csrf
-                                    <label class="form-label small fw-bold">Explain justification:</label>
-                                    <textarea name="explanation" class="form-control mb-3" rows="3" placeholder="Explain why the current document is correct..." required></textarea>
-                                    <button type="submit" class="btn btn-dark w-100 fw-bold">SEND BACK TO SIGNER WITH EXPLANATION</button>
+                                    <textarea name="explanation" class="form-control mb-3" rows="3" placeholder="Explain your justification..." required></textarea>
+                                    <button type="submit" class="btn btn-dark btn-docu w-100">Send Explanation to Signer</button>
                                 </form>
                             </div>
                         </div>
@@ -243,38 +198,25 @@
                 </div>
             @endif
 
-            <!-- 3C. MAIN DOCUMENT VIEWER -->
-            <div class="card shadow-sm border-0 rounded-3 overflow-hidden mb-3">
-                <div class="card-header bg-white py-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
-                    <h6 class="mb-0 fw-bold text-dark text-truncate" style="max-width: 50%;">
-                        <i class="fa {{ $isActuallyPhysical ? 'fa-box' : 'fa-file-pdf' }} me-2 text-maroon"></i>
-                        {{ strtoupper($document->title) }}
-                    </h6>
-                    
+            <!-- 3C. MAIN VIEWER -->
+            <div class="tracer-card">
+                <div class="tracer-card-header">
+                    <h6><i class="fa {{ $isActuallyPhysical ? 'fa-box-open' : 'fa-file-pdf' }} me-2 text-maroon"></i> {{ strtoupper($document->title) }}</h6>
                     <div class="d-flex gap-2">
                         @if(!$isActuallyPhysical)
-                            <a href="{{ route('documents.download', $document->tracking_id) }}" target="_blank" class="btn btn-sm btn-outline-dark fw-bold">
-                                <i class="fa fa-expand me-1"></i> FULLSCREEN
-                            </a>
-
+                            <a href="{{ route('documents.download', $document->tracking_id) }}" target="_blank" class="btn btn-dark btn-docu py-1 px-3">Fullscreen</a>
                             @if($document->status == 'accepted')
-                                <a href="{{ route('documents.download', $document->tracking_id) }}?download=1" class="btn btn-sm btn-maroon fw-bold px-3">
-                                    <i class="fa fa-download me-1"></i> DOWNLOAD FINAL PDF
-                                </a>
-                                <button onclick="printIframe()" class="btn btn-sm btn-dark fw-bold px-3">
-                                    <i class="fa fa-print me-1"></i> PRINT
-                                </button>
+                                <button onclick="printIframe()" class="btn btn-maroon btn-docu py-1 px-3"><i class="fa fa-print"></i></button>
                             @endif
                         @endif
                     </div>
                 </div>
-
-                <div class="card-body p-0 bg-pro-grey" style="height: 70vh;">
+                <div class="card-body p-0 bg-pro-grey" style="height: 65vh; min-height: 400px;">
                     @if($isActuallyPhysical)
-                        <div class="d-flex flex-column align-items-center justify-content-center h-100 bg-white text-center p-5">
-                            <i class="fa fa-box-open fa-5x text-maroon opacity-10 mb-4"></i>
-                            <h2 class="fw-black text-dark text-uppercase mb-2">Physical Hard Copy</h2>
-                            <p class="text-muted small">Digital signatures replaced with receipt confirmation.</p>
+                        <div class="d-flex flex-column align-items-center justify-content-center h-100 bg-white p-5 text-center">
+                            <i class="fa fa-box-archive fa-5x text-maroon opacity-10 mb-3 animate__animated animate__pulse animate__infinite"></i>
+                            <h2 class="fw-black text-uppercase mb-2">Physical Item Tracking</h2>
+                            <p class="text-muted small fw-bold">Manual receipt confirmation required below.</p>
                         </div>
                     @else
                         <iframe id="doc-iframe" src="{{ url('/document/live-preview/' . $document->id) }}#toolbar=0" width="100%" height="100%" style="border: none;"></iframe>
@@ -282,74 +224,171 @@
                 </div>
             </div>
 
-            <!-- 3D. ACTION BUTTONS (SIGNATORY ONLY) -->
+            <!-- 3D. ACTION PANEL (FOR SIGNATORIES) -->
             @if($isMyTurn)
-                <div class="card border-0 shadow-sm rounded-3 p-4 bg-white border-top border-warning border-5 animate__animated animate__pulse">
-                    @if($uploaderExplanation)
-                        <div class="alert shadow-sm border-0 mb-4" style="background-color: #f0f7ff; border-left: 5px solid #0056b3 !important;">
-                            <div class="d-flex align-items-center">
-                                <div class="p-2 rounded-circle bg-white text-primary border me-3"><i class="fa fa-info-circle fs-4"></i></div>
-                                <div>
-                                    <h6 class="mb-1 fw-black text-primary text-uppercase" style="letter-spacing: 0.5px;">Creator Disputed Return Reason</h6>
-                                    <p class="mb-0 text-dark italic">"{{ $uploaderExplanation }}"</p>
-                                </div>
+                <div class="tracer-card border-0" style="background-color: #fffbeb; border-top: 5px solid var(--ispsc-yellow) !important;">
+                    <div class="card-body p-4 bg-white bg-opacity-25">
+                        <div class="text-center mb-4"><h6 class="fw-black text-uppercase m-0">Your Action is Required</h6></div>
+                        @if($uploaderExplanation)
+                            <div class="alert border-0 bg-white mb-4 shadow-sm" style="border-left: 5px solid var(--ispsc-blue) !important;">
+                                <h6 class="fw-black text-primary text-uppercase small mb-1">Creator Note:</h6>
+                                <p class="mb-0 italic small text-dark">"{{ $uploaderExplanation }}"</p>
                             </div>
-                        </div>
-                    @endif
-
-                    @if($isActuallyPhysical)
-                        <div class="text-center py-2">
-                            <h4 class="fw-bold mb-3 text-dark">CONFIRM PHYSICAL RECEIPT</h4>
-                            <button class="btn btn-success btn-lg fw-bold w-100 py-3 shadow-sm" id="btn-confirm-receipt">
-                                I HAVE RECEIVED THIS ITEM <i class="fa fa-check-circle ms-2"></i>
-                            </button>
-                        </div>
-                    @else
-                        <div class="text-center mb-3">
-                            <h5 class="fw-bold text-dark text-uppercase small mb-1">Your Action is Required</h5>
-                            <p class="text-muted small">Verify details and apply digital signature.</p>
-                        </div>
+                        @endif
                         <div class="d-flex gap-3">
-                            <button class="btn btn-success flex-fill py-3 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#signatureModal">SIGN DOCUMENT NOW</button>
+                            @if($isActuallyPhysical)
+                                <button class="btn btn-success flex-fill py-3 fw-black shadow-sm fs-6" id="btn-confirm-receipt">
+                                    I HAVE RECEIVED THE HARD COPY <i class="fa fa-check-circle ms-2"></i>
+                                </button>
+                            @else
+                                <button class="btn btn-success flex-fill py-3 fw-black shadow-sm fs-6" data-bs-toggle="modal" data-bs-target="#signatureModal">APPLY DIGITAL SIGNATURE</button>
+                            @endif
                             <button class="btn btn-outline-danger px-4 fw-bold" data-bs-toggle="modal" data-bs-target="#returnModal">RETURN</button>
                         </div>
-                    @endif
+                    </div>
                 </div>
             @endif
+        </div>
+
+        <!-- RIGHT SIDEBAR -->
+        <div class="col-lg-4">
+            <div class="tracer-card text-center p-4">
+                <h6>Record QR Code</h6>
+                <div class="bg-light p-3 rounded mb-3 d-inline-block border mt-3" id="printableQR">{!! $qrCode !!}</div>
+                <button type="button" onclick="downloadQRAsPNG()" class="btn btn-outline-dark btn-docu w-100"><i class="fa fa-download me-2"></i> Download PNG</button>
+            </div>
+
+            <div class="tracer-card">
+                <div class="tracer-card-header"><h6>Record Info</h6></div>
+                <div class="card-body p-4">
+                    <div class="mb-3 d-flex justify-content-between"><span class="text-muted fw-bold">Office:</span><span class="fw-bold text-end" style="max-width: 150px;">{{ $document->uploader->office->office_name ?? 'RECORDS' }}</span></div>
+                    <div class="d-flex justify-content-between"><span class="text-muted fw-bold">Priority:</span><span class="small fw-bold text-maroon">Level {{ $document->priority ?? '0' }}</span></div>
+                </div>
+                <div class="card-footer bg-light border-0 p-3 d-flex flex-column gap-2">
+                    <button class="btn btn-dark btn-docu w-100 py-2" data-bs-toggle="modal" data-bs-target="#trailModal">Audit Trail</button>
+                    @if($document->status == 'accepted' && $isAdminOrRecords)
+                        <button class="btn btn-maroon btn-docu w-100" data-bs-toggle="modal" data-bs-target="#disseminateModal">Share Copies</button>
+                    @endif
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
-{{-- MODALS BLOCK --}}
-
-<!-- AUDIT TRAIL MODAL -->
-<div class="modal fade" id="trailModal" tabindex="-1">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
-        <div class="modal-content border-0">
+<!-- AUDIT TRAIL MODAL (WITH RESPONSIVE FIX) -->
+<div class="modal fade" id="trailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
             <div class="modal-header bg-dark text-white py-3">
-                <h5 class="modal-title fw-bold small text-uppercase ls-1">Document Audit Trail</h5>
+                <h6 class="modal-title fw-black text-uppercase m-0" style="font-size: 12px; letter-spacing: 1px;">
+                    <i class="fa fa-history me-2"></i> Document Audit Trail
+                </h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-0">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="bg-light text-secondary small">
-                        <tr><th class="ps-4">TIMESTAMP</th><th>ACTION</th><th>PERSONNEL</th><th>REMARKS</th></tr>
-                    </thead>
-                    <tbody style="font-size: 0.85rem;">
-                        @foreach($document->logs->sortByDesc('created_at') as $log)
-                            @php
-                                $rawAct = strtoupper($log->action);
-                                $dispAct = ($rawAct === 'TIME OF HELLO' || $rawAct === 'CREATED') ? 'REGISTRATION' : (($isActuallyPhysical && $rawAct === 'DIGITAL SIGNATURE APPLIED') ? 'RECEIVED' : $rawAct);
-                            @endphp
-                            <tr>
-                                <td class="ps-4 text-muted">{{ $log->created_at->format('M d, Y | h:i A') }}</td>
-                                <td><span class="badge border text-dark">{{ $dispAct }}</span></td>
-                                <td class="fw-bold">{{ $log->user->username }}</td>
-                                <td class="small text-muted italic">{{ $log->remarks }}</td>
+                <div class="table-responsive">
+                    <table class="table table-hover audit-table align-middle mb-0 w-100">
+                        <thead class="bg-light">
+                            <tr class="small text-secondary fw-bold text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">
+                                <th class="ps-4 py-3" style="width: 180px;">Timestamp</th>
+                                <th class="py-3" style="width: 160px;">Action</th>
+                                <th class="py-3" style="width: 200px;">Personnel</th>
+                                <th class="py-3">Remarks / Comments</th>
                             </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody style="font-size: 13px; color: #333;">
+                            @forelse($document->logs->sortByDesc('created_at') as $log)
+                            <tr>
+                                <td class="ps-4 text-muted fw-medium">
+                                    {{ $log->created_at->format('M d, Y') }} 
+                                    <span class="opacity-50 mx-1">|</span> 
+                                    <span class="text-dark">{{ $log->created_at->format('h:i A') }}</span>
+                                </td>
+                                <td>
+                                    @php
+                                        $act = strtoupper($log->action);
+                                        $color = match(true) {
+                                            str_contains($act, 'SIGNATURE') || str_contains($act, 'RECEIVED') => 'text-success border-success',
+                                            str_contains($act, 'RETURN') || str_contains($act, 'DISCARD') => 'text-danger border-danger',
+                                            str_contains($act, 'FINALIZED') || str_contains($act, 'CREATED') => 'text-primary border-primary',
+                                            default => 'text-dark border-secondary'
+                                        };
+                                    @endphp
+                                    <span class="badge border {{ $color }} px-2 py-1" style="font-size: 9px; font-weight: 800;">{{ $act }}</span>
+                                </td>
+                                <td class="fw-bold text-dark">{{ $log->user->username }}</td>
+                                <td class="text-muted" style="line-height: 1.5;">{{ $log->remarks ?? '---' }}</td>
+                            </tr>
+                            @empty
+                            <tr><td colspan="4" class="text-center py-5 text-muted fw-bold">No activity logs recorded yet.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer bg-light border-top p-3">
+                <button type="button" class="btn btn-secondary fw-bold px-5 rounded-pill shadow-sm" data-bs-dismiss="modal" style="font-size: 12px;">CLOSE</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- AUDIT TRAIL MODAL -->
+<div class="modal fade" id="trailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+            <div class="modal-header bg-dark text-white py-3">
+                <h6 class="modal-title fw-black text-uppercase m-0" style="font-size: 12px; letter-spacing: 1px;">
+                    <i class="fa fa-history me-2"></i> Document Audit Trail
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover audit-table align-middle mb-0 w-100">
+                        <thead class="bg-light">
+                            <tr class="small text-secondary fw-bold text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">
+                                <th class="ps-4 py-3" style="width: 220px;">Timestamp</th>
+                                <th class="py-3" style="width: 180px;">Action</th>
+                                <th class="py-3" style="width: 200px;">Personnel</th>
+                                <th class="py-3" style="min-width: 300px;">Remarks / Comments</th>
+                            </tr>
+                        </thead>
+                        <tbody style="font-size: 13px; color: #333;">
+                            @forelse($document->logs->sortByDesc('created_at') as $log)
+                            <tr>
+                                <td class="ps-4 text-muted fw-medium">
+                                    {{ $log->created_at->format('M d, Y') }} 
+                                    <span class="opacity-50 mx-1">|</span> 
+                                    <span class="text-dark">{{ $log->created_at->format('h:i A') }}</span>
+                                </td>
+                                <td>
+                                    @php
+                                        $act = strtoupper($log->action);
+                                        $color = match(true) {
+                                            str_contains($act, 'SIGNATURE') || str_contains($act, 'RECEIVED') => 'text-success border-success',
+                                            str_contains($act, 'RETURN') || str_contains($act, 'DISCARD') => 'text-danger border-danger',
+                                            str_contains($act, 'FINALIZED') || str_contains($act, 'CREATED') => 'text-primary border-primary',
+                                            default => 'text-dark border-secondary'
+                                        };
+                                    @endphp
+                                    <span class="badge border {{ $color }} px-2 py-1" style="font-size: 10px; font-weight: 800;">{{ $act }}</span>
+                                </td>
+                                <td class="fw-bold text-dark">
+                                    <i class="fa fa-user-circle opacity-25 me-1"></i> {{ $log->user->username }}
+                                </td>
+                                <td class="text-muted" style="line-height: 1.5; word-break: break-word; white-space: normal;">
+                                    {{ $log->remarks ?? '---' }}
+                                </td>
+                            </tr>
+                            @empty
+                            <tr><td colspan="4" class="text-center py-5 text-muted fw-bold">No activity logs recorded yet.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer bg-light border-top p-3">
+                <button type="button" class="btn btn-secondary fw-bold px-5 rounded-pill shadow-sm" data-bs-dismiss="modal" style="font-size: 12px;">CLOSE TRAIL</button>
             </div>
         </div>
     </div>
@@ -360,12 +399,9 @@
     <div class="modal-dialog modal-dialog-centered">
         <form action="{{ route('documents.disseminate', $document->id) }}" method="POST">
             @csrf
-            <div class="modal-content shadow-lg border-0">
-                <div class="modal-header bg-maroon text-white py-3">
-                    <h5 class="modal-title fw-bold small text-uppercase">Share Official Copies</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
+            <div class="modal-content border-0">
+                <div class="modal-header bg-dark text-white py-2"><h6 class="modal-title fw-black small text-uppercase">Share Copies</h6><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body p-3" style="max-height: 400px; overflow-y: auto;">
                     @foreach(\App\Models\Office::where('id', '!=', Auth::user()->office_id)->orderBy('office_name','asc')->get() as $off)
                         <div class="form-check mb-2">
                             <input class="form-check-input" type="checkbox" name="office_ids[]" value="{{ $off->id }}" id="o{{ $off->id }}">
@@ -373,7 +409,7 @@
                         </div>
                     @endforeach
                 </div>
-                <div class="modal-footer"><button type="submit" class="btn btn-maroon w-100 fw-bold py-2 shadow">OFFICIALLY DISSEMINATE</button></div>
+                <div class="modal-footer bg-light p-2"><button type="submit" class="btn btn-maroon btn-docu w-100 py-2">SEND OFFICIAL COPIES</button></div>
             </div>
         </form>
     </div>
@@ -383,252 +419,114 @@
 <div class="modal fade" id="signatureModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-dark text-white py-3"><h5 class="modal-title fw-bold small text-uppercase">Apply Digital Signature</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body text-center p-4">
-                <ul class="nav nav-pills nav-justified mb-3 bg-light p-1 rounded" role="tablist">
-                    <li class="nav-item"><button class="nav-link active fw-bold small" data-bs-toggle="pill" data-bs-target="#draw-tab">DRAW</button></li>
-                    <li class="nav-item"><button class="nav-link fw-bold small" data-bs-toggle="pill" data-bs-target="#upload-tab">UPLOAD</button></li>
+            <div class="modal-header bg-dark text-white py-2"><h5 class="modal-title fw-black small text-uppercase">Affix Signature</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body text-center p-3">
+                <ul class="nav nav-pills nav-justified mb-2 bg-light p-1 rounded-pill" role="tablist">
+                    <li class="nav-item"><button class="nav-link active fw-bold small rounded-pill py-1" data-bs-toggle="pill" data-bs-target="#draw-tab">DRAW</button></li>
+                    <li class="nav-item"><button class="nav-link fw-bold small rounded-pill py-1" data-bs-toggle="pill" data-bs-target="#upload-tab">UPLOAD</button></li>
                 </ul>
                 <div class="tab-content">
                     <div class="tab-pane fade show active" id="draw-tab">
-                        <canvas id="sig-canvas" class="border bg-white w-100 rounded" style="height: 200px; cursor: crosshair;"></canvas>
-                        <button type="button" class="btn btn-sm text-danger mt-2 fw-bold" id="clear-sig"><i class="fa fa-eraser me-1"></i> CLEAR PAD</button>
+                        <canvas id="sig-canvas" class="border bg-white w-100 rounded" style="height: 180px;"></canvas>
+                        <button type="button" class="btn btn-sm text-danger mt-1 fw-bold" id="clear-sig">CLEAR</button>
                     </div>
                     <div class="tab-pane fade" id="upload-tab">
-                        <input type="file" id="sig-file" class="form-control" accept="image/*">
-                        <img id="sig-preview" class="d-none border rounded w-100 mt-2 shadow-sm">
+                        <input type="file" id="sig-file" class="form-control form-control-sm" accept="image/*">
+                        <img id="sig-preview" class="d-none border rounded w-100 mt-2">
                     </div>
                 </div>
             </div>
-            <div class="modal-footer border-0 p-4 pt-0"><button type="button" class="btn btn-success w-100 fw-black py-3 shadow-lg" id="btn-submit-signature">AFFIX SIGNATURE & PROCEED</button></div>
+            <div class="modal-footer border-0 p-3 pt-0"><button type="button" class="btn btn-success w-100 py-2 fw-bold" id="btn-submit-signature">CONFIRM SIGNATURE</button></div>
         </div>
     </div>
 </div>
 
 <!-- RETURN MODAL -->
 <div class="modal fade" id="returnModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-danger text-white py-3"><h5 class="modal-title fw-bold small text-uppercase">Return for Correction</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body p-4"><label class="form-label fw-bold small">Reason:</label><textarea id="return-remarks" class="form-control border-danger shadow-sm" rows="4" placeholder="Specify clearly why..."></textarea></div>
-            <div class="modal-footer border-0 p-4 pt-0"><button type="button" class="btn btn-danger w-100 fw-bold py-2 shadow" id="confirm-return">NOTIFY CREATOR & RETURN</button></div>
-        </div>
-    </div>
-</div>
-
-<!-- QR MODAL -->
-<div class="modal fade" id="qrModal" tabindex="-1">
-    <div class="modal-dialog modal-sm modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-dark text-white py-2">
-                <h6 class="modal-title fw-bold small text-uppercase">Tracking QR</h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body text-center p-4" id="printableQR">
-                {{-- Ensure the wrapper has a background for better PNG quality --}}
-                <div class="p-3 bg-white d-inline-block border mb-3 rounded shadow-sm">
-                    {!! $qrCode !!}
-                </div>
-                <h6 class="text-maroon fw-bold font-monospace small mb-0">{{ $document->tracking_id }}</h6>
-            </div>
-            <div class="modal-footer p-2 border-0">
-                {{-- NEW: Trigger JavaScript PNG Download --}}
-                <button type="button" onclick="downloadQRAsPNG()" class="btn btn-maroon btn-sm w-100 py-2 fw-bold shadow-sm">
-                    <i class="fa fa-download me-1"></i> DOWNLOAD PNG
-                </button>
-            </div>
-        </div>
-    </div>
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0"><div class="modal-header bg-danger text-white py-2"><h5 class="modal-title fw-black small text-uppercase">Return Record</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div class="modal-body p-3"><label class="form-label fw-bold small">Reason:</label><textarea id="return-remarks" class="form-control form-control-sm" rows="3" placeholder="Specify reason..."></textarea></div><div class="modal-footer border-0 p-3 pt-0"><button type="button" class="btn btn-danger w-100 py-2 fw-bold" id="confirm-return">SUBMIT RETURN</button></div></div></div>
 </div>
 
 @endsection
 
 @push('scripts')
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    const canvas = document.getElementById('sig-canvas');
-    const ctx = canvas.getContext('2d');
-    const submitBtn = document.getElementById('btn-submit-signature');
-    const clearBtn = document.getElementById('clear-sig');
-    const receiptBtn = document.getElementById('btn-confirm-receipt');
-    const fileInput = document.getElementById('sig-file');
-    const sigPreview = document.getElementById('sig-preview');
-    
-    let drawing = false;
-    let hasSigned = false;
-
-    // --- BUG FIX: DPI / Resolution scaling for Canvas ---
-    function initCanvas() {
-        const rect = canvas.getBoundingClientRect();
-        const dpr = window.devicePixelRatio || 1;
-        canvas.width = rect.width * dpr;
-        canvas.height = rect.height * dpr;
-        ctx.scale(dpr, dpr);
-        ctx.strokeStyle = "#000000";
-        ctx.lineWidth = 2;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
+    function printIframe() {
+        const iframe = document.getElementById('doc-iframe');
+        if (iframe) { iframe.contentWindow.focus(); iframe.contentWindow.print(); }
     }
 
-    // Trigger resize when modal opens or tab switches
-    document.getElementById('signatureModal').addEventListener('shown.bs.modal', initCanvas);
-    document.querySelector('button[data-bs-target="#draw-tab"]').addEventListener('shown.bs.tab', initCanvas);
+    document.addEventListener('DOMContentLoaded', function () {
+        const canvas = document.getElementById('sig-canvas');
+        const ctx = canvas.getContext('2d');
+        const submitBtn = document.getElementById('btn-submit-signature');
+        const clearBtn = document.getElementById('clear-sig');
+        const fileInput = document.getElementById('sig-file');
+        const sigPreview = document.getElementById('sig-preview');
+        let drawing = false; let hasSigned = false;
 
-    // --- Drawing Coordinates Logic ---
-    function getMousePos(e) {
-        const rect = canvas.getBoundingClientRect();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        return { x: clientX - rect.left, y: clientY - rect.top };
-    }
+        function initCanvas() { 
+            const rect = canvas.getBoundingClientRect(); 
+            const dpr = window.devicePixelRatio || 1; 
+            canvas.width = rect.width * dpr; 
+            canvas.height = rect.height * dpr; 
+            ctx.strokeStyle = "#000"; ctx.lineWidth = 2; ctx.lineCap = "round"; 
+        }
 
-    function startDrawing(e) {
-        drawing = true;
-        const pos = getMousePos(e);
-        ctx.beginPath();
-        ctx.moveTo(pos.x, pos.y);
-        e.preventDefault();
-    }
+        document.getElementById('signatureModal').addEventListener('shown.bs.modal', initCanvas);
+        
+        function getMousePos(e) { 
+            const rect = canvas.getBoundingClientRect(); 
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX; 
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY; 
+            return { x: clientX - rect.left, y: clientY - rect.top }; 
+        }
 
-    function draw(e) {
-        if (!drawing) return;
-        const pos = getMousePos(e);
-        ctx.lineTo(pos.x, pos.y);
-        ctx.stroke();
-        hasSigned = true;
-        e.preventDefault();
-    }
+        function startDrawing(e) { drawing = true; const pos = getMousePos(e); ctx.beginPath(); ctx.moveTo(pos.x, pos.y); e.preventDefault(); }
+        function draw(e) { if (!drawing) return; const pos = getMousePos(e); ctx.lineTo(pos.x, pos.y); ctx.stroke(); hasSigned = true; e.preventDefault(); }
+        function stopDrawing() { drawing = false; ctx.closePath(); }
 
-    function stopDrawing() {
-        drawing = false;
-        ctx.closePath();
-    }
-
-    canvas.addEventListener('mousedown', startDrawing);
-    canvas.addEventListener('mousemove', draw);
-    canvas.addEventListener('mouseup', stopDrawing);
-    canvas.addEventListener('mouseout', stopDrawing);
-    canvas.addEventListener('touchstart', startDrawing);
-    canvas.addEventListener('touchmove', draw);
-    canvas.addEventListener('touchend', stopDrawing);
-
-    // Clear Pad
-    clearBtn.addEventListener('click', function() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        hasSigned = false;
-    });
-
-    // --- BUG FIX: File input listener to populate preview ---
-    fileInput.addEventListener('change', function(e) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            sigPreview.src = event.target.result;
-            sigPreview.classList.remove('d-none');
-            hasSigned = true; 
-        };
-        if(e.target.files[0]) reader.readAsDataURL(e.target.files[0]);
-    });
-
-    // Handle Signature Submission (Digital)
-    submitBtn.addEventListener('click', function() {
-        if (!hasSigned) return Swal.fire('Error', 'Please provide a signature first.', 'error');
-
-        const isDrawing = document.getElementById('draw-tab').classList.contains('active');
-        const signatureData = isDrawing ? canvas.toDataURL('image/png') : sigPreview.src;
-
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Processing...';
-
-        performSignAction(signatureData);
-    });
-
-    // --- BUG FIX: Physical Receipt Confirmation Listener ---
-    if(receiptBtn) {
-        receiptBtn.addEventListener('click', function() {
-            receiptBtn.disabled = true;
-            receiptBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Confirming...';
-            performSignAction('PHYSICAL_RECEIPT');
+        canvas.addEventListener('mousedown', startDrawing); canvas.addEventListener('mousemove', draw); canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('touchstart', startDrawing); canvas.addEventListener('touchmove', draw); canvas.addEventListener('touchend', stopDrawing);
+        
+        clearBtn.addEventListener('click', () => { ctx.clearRect(0, 0, canvas.width, canvas.height); hasSigned = false; });
+        
+        fileInput.addEventListener('change', (e) => { 
+            const reader = new FileReader(); 
+            reader.onload = (event) => { sigPreview.src = event.target.result; sigPreview.classList.remove('d-none'); hasSigned = true; }; 
+            if(e.target.files[0]) reader.readAsDataURL(e.target.files[0]); 
         });
-    }
 
-    function performSignAction(data) {
-        fetch("{{ route('documents.sign', $document->tracking_id) }}", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "X-CSRF-TOKEN": "{{ csrf_token() }}" },
-            body: JSON.stringify({ signature_data: data })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success') {
-                Swal.fire({ title: 'Success!', text: 'Action recorded successfully.', icon: 'success', timer: 2000, showConfirmButton: false })
-                .then(() => window.location.reload());
-            } else { throw new Error(); }
-        })
-        .catch(() => {
-            Swal.fire('Error', 'Transaction failed.', 'error');
-            if(receiptBtn) { receiptBtn.disabled = false; receiptBtn.innerHTML = 'I HAVE RECEIVED THIS ITEM'; }
-            submitBtn.disabled = false; submitBtn.innerHTML = 'AFFIX SIGNATURE & PROCEED';
+        submitBtn.addEventListener('click', function() { 
+            if (!hasSigned) return Swal.fire('Error', 'Sign first.', 'error'); 
+            const isDrawing = document.getElementById('draw-tab').classList.contains('active'); 
+            const signatureData = isDrawing ? canvas.toDataURL('image/png') : sigPreview.src; 
+            submitBtn.disabled = true;
+            fetch("{{ route('documents.sign', $document->tracking_id) }}", { 
+                method: "POST", headers: { "Content-Type": "application/json", "X-CSRF-TOKEN": "{{ csrf_token() }}" }, 
+                body: JSON.stringify({ signature_data: signatureData }) 
+            }).then(() => window.location.reload());
         });
-    }
 
-    // Return logic
-    document.getElementById('confirm-return').addEventListener('click', function() {
-        const remarks = document.getElementById('return-remarks').value;
-        if (!remarks) return Swal.fire('Notice', 'Please provide a reason.', 'info');
-
-        fetch("{{ route('documents.return', $document->tracking_id) }}", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "X-CSRF-TOKEN": "{{ csrf_token() }}" },
-            body: JSON.stringify({ remarks: remarks })
-        }).then(() => window.location.reload());
+        document.getElementById('confirm-return').addEventListener('click', function() { 
+            const remarks = document.getElementById('return-remarks').value; 
+            if (!remarks) return; 
+            fetch("{{ route('documents.return', $document->tracking_id) }}", { 
+                method: "POST", headers: { "Content-Type": "application/json", "X-CSRF-TOKEN": "{{ csrf_token() }}" }, 
+                body: JSON.stringify({ remarks: remarks }) 
+            }).then(() => window.location.reload()); 
+        });
     });
-});
 
-function downloadQRAsPNG() {
-    // 1. Get the SVG element from the modal
-    const svgElement = document.querySelector('#printableQR svg');
-    if (!svgElement) return;
-
-    // 2. Serialize the SVG and create a standard image URL
-    const svgData = new XMLSerializer().serializeToString(svgElement);
-    const svgBlob = new Blob([svgData], {type: 'image/svg+xml;charset=utf-8'});
-    const url = URL.createObjectURL(svgBlob);
-
-    // 3. Setup Canvas (using a high scale for better quality)
-    const canvas = document.createElement("canvas");
-    const img = new Image();
-    
-    // Quality scaling: 1000x1000 makes a crisp print
-    canvas.width = 1000;
-    canvas.height = 1000;
-    const ctx = canvas.getContext("2d");
-
-    img.onload = function() {
-        // A. Draw a White Background first (IMPORTANT for scanning)
-        ctx.fillStyle = "white";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // B. Draw the QR image on top
-        ctx.drawImage(img, 0, 0, 1000, 1000);
-
-        // C. Trigger PNG Download
-        const pngUrl = canvas.toDataURL("image/png");
-        const downloadLink = document.createElement("a");
-        
-        // Dynamic Filename using tracking ID
-        const filename = "QR_{{ $document->tracking_id }}".replace(/[\/\\?%*:|"<>\s]/g, '-');
-        
-        downloadLink.href = pngUrl;
-        downloadLink.download = `${filename}.png`;
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
-        document.body.removeChild(downloadLink);
-        
-        // Clean up
-        URL.revokeObjectURL(url);
-    };
-
-    img.src = url;
-}
+    function downloadQRAsPNG() { 
+        const svgElement = document.querySelector('#printableQR svg'); 
+        const svgData = new XMLSerializer().serializeToString(svgElement); 
+        const canvas = document.createElement("canvas"); canvas.width = 800; canvas.height = 800;
+        const img = new Image(); img.onload = function() { 
+            canvas.getContext("2d").fillStyle = "white"; 
+            canvas.getContext("2d").fillRect(0, 0, 800, 800); 
+            canvas.getContext("2d").drawImage(img, 0, 0, 800, 800); 
+            const a = document.createElement("a"); a.href = canvas.toDataURL("image/png"); a.download = "QR.png"; a.click(); 
+        }; img.src = 'data:image/svg+xml;base64,' + btoa(svgData); 
+    }
 </script>
 @endpush

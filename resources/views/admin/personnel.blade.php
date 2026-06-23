@@ -4,140 +4,128 @@
 
 @push('css')
 <style>
-    /* THEME COLORS */
-    :root {
-        --ispsc-maroon: #800000;
+    :root { 
+        --ispsc-maroon: #800000; 
         --ispsc-yellow: #FFCC00;
-        --ispsc-gold: #d4a017;
+        --ispsc-blue: #0056b3;
+        --bg-light: #f4f7f9;
     }
 
-    .text-maroon { color: var(--ispsc-maroon) !important; }
-    .bg-maroon { background-color: var(--ispsc-maroon) !important; color: white !important; }
-    .border-maroon { border-color: var(--ispsc-maroon) !important; }
+    body { background-color: var(--bg-light); font-size: 14px; color: #333; }
+    .main-content-fluid { width: 100%; padding: 0 40px; }
 
-    /* BUTTON STYLING */
-    .btn-maroon { 
-        background-color: var(--ispsc-maroon) !important; 
-        color: var(--ispsc-yellow) !important; 
-        border: none;
-        font-weight: bold;
-        transition: 0.3s;
+    /* CARD STYLING ALIGNED TO DASHBOARD */
+    .tracer-card { 
+        background: #fff; border: 1px solid #e1e8ed; border-radius: 12px; 
+        margin-bottom: 25px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); overflow: hidden; 
     }
-    .btn-maroon:hover { 
-        background-color: #600000 !important; 
-        color: #ffffff !important; 
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    .tracer-card-header { 
+        padding: 15px 25px; border-bottom: 1px solid #f1f1f1; 
+        display: flex; justify-content: space-between; align-items: center; background: #fff; 
     }
+    .tracer-card-header h6 { margin: 0; font-weight: 800; color: #000; text-transform: uppercase; font-size: 13px; }
 
-    .btn-outline-maroon {
-        border: 1px solid var(--ispsc-maroon);
-        color: var(--ispsc-maroon);
-        background: white;
+    /* TABLE DESIGN (14px Content) */
+    .table thead th { 
+        background: #f8f9fa; color: #666; font-size: 11px; 
+        text-transform: uppercase; font-weight: 800; border: none; 
+        padding: 15px 20px;
     }
-    .btn-outline-maroon:hover {
-        background: var(--ispsc-maroon);
-        color: white;
-    }
-
-    /* TABLE STYLING */
-    .table-theme thead th {
-        background-color: #f8f9fa;
-        color: var(--ispsc-maroon);
-        font-weight: 700;
-        text-transform: uppercase;
-        font-size: 0.75rem;
-        letter-spacing: 0.5px;
-        border-bottom: 2px solid var(--ispsc-maroon);
+    .ledger-row td { 
+        padding: 18px 20px !important; 
+        border-bottom: 1px solid #f1f1f1 !important; 
+        font-size: 14px; /* NORMAL INFO 14px */
+        vertical-align: middle;
     }
 
-    .office-table-container {
-        max-height: 480px;
-        overflow-y: auto;
-        border-radius: 0 0 12px 12px;
+    /* SEARCH STYLE IN HEADER */
+    .header-search-container { position: relative; width: 100%; }
+    .header-search { 
+        width: 100%; padding: 8px 15px 8px 35px; border-radius: 8px; 
+        border: 1px solid #e1e8ed; font-size: 12px; font-weight: 600; 
     }
+    .header-search-icon { position: absolute; left: 12px; top: 10px; color: #adb5bd; font-size: 12px; }
 
-    /* CUSTOM SEARCH BOX */
-    .header-search {
-        max-width: 300px;
-        border-radius: 20px;
-        border: 1px solid rgba(255,255,255,0.3) !important;
-        background: rgba(255,255,255,0.1) !important;
-        color: white !important;
-    }
-    .header-search::placeholder { color: rgba(255,255,255,0.7); }
+    /* BUTTONS */
+    .btn-docu { border-radius: 10px; font-weight: 800; text-transform: uppercase; font-size: 13px; padding: 10px 25px; transition: 0.3s; border: none; }
+    .btn-maroon { background: var(--ispsc-maroon); color: #fff; }
+    .btn-maroon:hover { background: #600000; transform: translateY(-2px); }
+    .btn-dark { background: #1a1a1a; color: #fff; }
+    
+    .btn-outline-maroon { border: 1.5px solid var(--ispsc-maroon); color: var(--ispsc-maroon); font-weight: 800; }
+    .btn-outline-maroon:hover { background: var(--ispsc-maroon); color: #fff; }
 
-    /* ROW HOVER */
-    .table-hover tbody tr:hover {
-        background-color: rgba(128, 0, 0, 0.04) !important;
-    }
+    .office-table-container { max-height: 500px; overflow-y: auto; }
+    .fw-black { font-weight: 900 !important; }
+
+    @media (max-width: 992px) { .main-content-fluid { padding: 0 15px; } }
 </style>
 @endpush
 
 @section('content')
-<div class="container-fluid py-4">
+<div class="main-content-fluid py-4">
     
-    <!-- PAGE HEADER -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2 class="fw-bold text-maroon mb-1">Personnel & Office Management</h2>
-            <p class="text-muted small mb-0">System administration hub for users and office structures.</p>
+    <!-- HEADER SECTION -->
+    <div class="row align-items-center mb-4 g-3">
+        <div class="col-lg-8">
+            <h4 class="fw-black mb-0">Personnel & Office Management</h4>
+            <small class="text-muted fw-bold">Institutional Structure & User Administration</small>
         </div>
-        <button class="btn btn-maroon shadow-sm px-4 py-2" data-bs-toggle="modal" data-bs-target="#registerStaffModal">
-            <i class="fa fa-user-plus me-2"></i> REGISTER STAFF
-        </button>
+        <div class="col-lg-4 d-flex justify-content-lg-end">
+            <button class="btn btn-docu btn-maroon shadow-sm" data-bs-toggle="modal" data-bs-target="#registerStaffModal">
+                <i class="fa fa-user-plus me-2"></i> REGISTER STAFF
+            </button>
+        </div>
     </div>
 
-    {{-- Session Alerts --}}
-    @if(session('msg'))
-        <div class="alert alert-success border-0 shadow-sm mb-4 alert-dismissible fade show">
-            <i class="fa fa-check-circle me-2"></i> {{ session('msg') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    @endif
-
     <div class="row g-4">
-        <!-- LEFT COLUMN: OFFICE MANAGEMENT -->
+        <!-- LEFT: OFFICE MANAGEMENT -->
         <div class="col-xl-4">
-            <!-- Add Office -->
-            <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
-                <div class="card-header bg-maroon py-3">
-                    <h6 class="mb-0 fw-bold text-uppercase small" style="letter-spacing: 1px;">Add New Office</h6>
+            <!-- ADD OFFICE -->
+            <div class="tracer-card">
+                <div class="tracer-card-header bg-maroon">
+                    <h6 class="text-dark mb-0">Create New Office </h6>
                 </div>
                 <div class="card-body p-4">
                     <form action="{{ route('admin.offices.store') }}" method="POST">
                         @csrf
                         <div class="mb-3">
-                            <label class="small fw-bold text-muted text-uppercase mb-2">Office Name</label>
-                            <input type="text" name="office_name" class="form-control form-control-lg border-light bg-light" placeholder="e.g. Accounting Office" required style="font-size: 0.9rem;">
+                            <label class="form-label fw-bold small text-muted text-uppercase mb-2">Institutional Name</label>
+                            <input type="text" name="office_name" class="form-control" placeholder="e.g. Registrar's Office" required>
                         </div>
-                        <button class="btn btn-maroon w-100 py-2 shadow-sm">SAVE OFFICE</button>
+                        <button class="btn btn-docu btn-dark w-100 py-2">SAVE OFFICE</button>
                     </form>
                 </div>
             </div>
 
-            <!-- Office List -->
-            <div class="card shadow-sm border-0" style="border-radius: 12px; overflow: hidden;">
-                <div class="card-header bg-maroon d-flex justify-content-between align-items-center py-2 px-3">
-                    <h6 class="mb-0 fw-bold text-uppercase small" style="letter-spacing: 1px;">Existing Offices</h6><br>
-                    <input type="text" id="officeSearch" class="form-control form-control-sm header-search px-3" placeholder="Search offices...">
+            <!-- OFFICE LIST -->
+            <div class="tracer-card">
+                <div class="tracer-card-header">
+                    <h6>Registry of Offices</h6>
                 </div>
-                <div class="card-body p-0 office-table-container">
-                    <table class="table table-hover align-middle mb-0 table-theme" id="officeTable">
+                <div class="p-3 border-bottom bg-light">
+                    <div class="header-search-container">
+                        <i class="fa fa-search header-search-icon"></i>
+                        <input type="text" id="officeSearch" class="header-search" placeholder="Filter office list...">
+                    </div>
+                </div>
+                <div class="office-table-container">
+                    <table class="table table-hover align-middle mb-0" id="officeTable">
                         <thead>
                             <tr>
-                                <th class="ps-3">OFFICE NAME</th>
-                                <th class="text-end pe-3">ACTION</th>
+                                <th class="ps-4">OFFICE NAME</th>
+                                <th class="text-end pe-4">ACTION</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach($offices as $office)
-                            <tr class="office-row">
-                                <td class="ps-3 office-name fw-bold text-dark" style="font-size: 0.85rem;">{{ $office->office_name }}</td>
-                                <td class="text-end pe-3">
+                            <tr class="office-row ledger-row">
+                                <td class="ps-4 office-name fw-bold text-dark">{{ $office->office_name }}</td>
+                                <td class="text-end pe-4">
                                     @if($office->id !== 'ISPSC-MC-REC-2026-4URQGK')
                                         <form action="{{ route('admin.offices.destroy', $office->id) }}" method="POST" class="d-inline">
                                             @csrf @method('DELETE')
-                                            <button class="btn btn-sm text-danger border-0 bg-transparent" onclick="return confirm('Delete Office?')">
+                                            <button class="btn btn-sm text-danger border-0 bg-transparent" onclick="return confirm('Delete this Office?')">
                                                 <i class="fa fa-trash-alt"></i>
                                             </button>
                                         </form>
@@ -146,7 +134,7 @@
                             </tr>
                             @endforeach
                             <tr id="noResults" style="display: none;">
-                                <td colspan="2" class="text-center py-4 text-muted small">No offices found.</td>
+                                <td colspan="2" class="text-center py-5 text-muted fw-bold">No matching hub found.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -154,59 +142,57 @@
             </div>
         </div>
 
-        <!-- RIGHT COLUMN: PERSONNEL LIST -->
+        <!-- RIGHT: PERSONNEL LIST -->
         <div class="col-xl-8">
-            <div class="card shadow-sm border-0" style="border-radius: 12px; overflow: hidden;">
-                <div class="card-header bg-maroon py-3">
-                    <h6 class="mb-0 fw-bold text-uppercase small" style="letter-spacing: 1px;">Registered Staff Members</h6>
+            <div class="tracer-card">
+                <div class="tracer-card-header">
+                    <h6>Registered Institutional Personnel</h6>
                 </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0 table-theme">
-                            <thead>
-                                <tr>
-                                    <th class="ps-4">NAME / EMAIL</th>
-                                    <th>OFFICE</th>
-                                    <th class="text-end pe-4">ACTION</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($allUsers as $u)
-                                <tr>
-                                    <td class="ps-4">
-                                        <div class="fw-bold text-dark">{{ $u->username }}</div>
-                                        <small class="text-muted">{{ $u->email }}</small>
-                                    </td>
-                                    <td>
-                                        <span class="small fw-bold text-muted">{{ $u->office->office_name ?? 'N/A' }}</span>
-                                    </td>
-                                    <td class="text-end pe-4">
-                                        <div class="d-flex justify-content-end gap-2">
-                                            <button class="btn btn-sm btn-outline-maroon fw-bold px-3" 
-                                                    onclick="openResetModal('{{ $u->id }}', '{{ $u->username }}')" title="Reset Password">
-                                                <i class="fa fa-key"></i>
-                                            </button>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-4">PERSONNEL / ACCOUNT EMAIL</th>
+                                <th>OFFICE</th>
+                                <th class="text-end pe-4">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($allUsers as $u)
+                            <tr class="ledger-row">
+                                <td class="ps-4">
+                                    <div class="fw-bold text-dark">{{ $u->username }}</div>
+                                    <small class="text-muted fw-bold">{{ $u->email }}</small>
+                                </td>
+                                <td>
+                                    <span class="small fw-bold text-muted">{{ $u->office->office_name ?? 'NOT ASSIGNED' }}</span>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <div class="d-flex justify-content-end gap-2">
+                                        <button class="btn btn-sm btn-outline-maroon px-3 py-1" onclick="openResetModal('{{ $u->id }}', '{{ $u->username }}')" title="Reset Security Code">
+                                            <i class="fa fa-key"></i>
+                                        </button>
 
-                                            @if($u->id !== Auth::id())
-                                                <form action="{{ route('admin.staff.destroy', $u->id) }}" method="POST" onsubmit="return confirm('Permanently remove this user?')">
-                                                    @csrf @method('DELETE')
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger px-3 shadow-sm">
-                                                        <i class="fa fa-trash-alt"></i>
-                                                    </button>
-                                                </form>
-                                            @endif
-                                        </div>
-                                    </td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
+                                        @if($u->id !== Auth::id())
+                                            <form action="{{ route('admin.staff.destroy', $u->id) }}" method="POST" onsubmit="return confirm('Remove personnel from registry?')">
+                                                @csrf @method('DELETE')
+                                                <button type="submit" class="btn btn-sm btn-outline-danger px-3 py-1">
+                                                    <i class="fa fa-trash-alt"></i>
+                                                </button>
+                                            </form>
+                                        @endif
+                                    </div>
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
 <!-- MODAL: REGISTER STAFF -->
 <div class="modal fade" id="registerStaffModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">

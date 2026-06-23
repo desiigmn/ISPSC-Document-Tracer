@@ -12,273 +12,339 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+
         :root {
             --ispsc-maroon: #800000;
             --ispsc-yellow: #FFCC00;
+            --sidebar-bg: #0b132b;
+            --bg-light: #f4f7f9;
+            --sidebar-width: 280px;
         }
 
-        /* 1. ACCESSIBILITY SCALING */
-        html { font-size: 16px; } 
-        @media (min-width: 1200px) { html { font-size: 17.5px; } }
-
         body {
-            background-color: #f4f7f6;
-            font-family: 'Segoe UI', Arial, sans-serif;
-            color: #111;
-            line-height: 1.5;
+            background-color: var(--bg-light);
+            font-family: 'Inter', sans-serif;
+            font-size: 14px; 
+            color: #1a1a1a;
+            margin: 0;
             display: flex;
-            flex-direction: column;
-            min-height: 100vh; /* Necessary for sticky footer */
+            min-height: 100vh;
             overflow-x: hidden;
         }
 
-        /* 2. REFINED NAVBAR UI */
-        .navbar-ispsc { 
-            background-color: var(--ispsc-maroon) !important; 
-            border-bottom: 4px solid var(--ispsc-yellow); 
-            padding: 10px 0;
-            z-index: 1030;
-        }
-
-        .brand-section {
-            line-height: 1.1;
-            padding-right: 1.5rem;
-            margin-right: 1.5rem;
-            border-right: 1.5px solid rgba(255,255,255,0.2);
-        }
-
-        .brand-text { font-weight: 900; font-size: 1.3rem; letter-spacing: 1.5px; color: #fff; text-transform: uppercase; }
-        .brand-sub { font-weight: 700; font-size: 0.65rem; color: #FFCC00; letter-spacing: 1px; text-transform: uppercase; }
-
-        .navbar-nav .nav-link { 
-            color: #ffffff !important; 
-            font-weight: 800; 
-            font-size: 0.95rem; 
-            padding: 0.7rem 1.2rem !important;
-            margin: 0 4px;
-            transition: 0.3s ease;
+        /* 1. SIDEBAR & BRANDING */
+        #sidebar {
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: var(--sidebar-bg);
+            position: fixed;
+            left: 0; top: 0;
+            z-index: 1100;
             display: flex;
-            align-items: center;
-            border-radius: 8px;
+            flex-direction: column;
+            color: #fff;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .navbar-nav .nav-link:hover { background: rgba(255, 255, 255, 0.1); color: #FFCC00 !important; }
-        .navbar-nav .nav-link.active { background: #FFCC00 !important; color: #800000 !important; }
+        .sidebar-header { padding: 40px 35px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .brand-text { font-weight: 900; font-size: 1.4rem; letter-spacing: -1px; color: #fff; line-height: 1.1; }
+        .brand-sub { font-weight: 700; font-size: 0.6rem; color: var(--ispsc-yellow); text-transform: uppercase; }
 
-        .nav-link i { font-size: 1.1rem; margin-right: 10px; }
-
-        /* 3. USER PROFILE */
-        .user-profile-meta { text-align: right; line-height: 1.1; }
-        .u-name { color: #fff; font-weight: 800; font-size: 0.95rem; }
-        .u-office { color: #FFCC00; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
-
-        .btn-power {
-            width: 42px; height: 42px;
-            border-radius: 50%;
-            border: 2px solid #FFCC00;
-            color: #FFCC00;
-            background: transparent;
+        /* User Profile (Centered) */
+        .sidebar-user {
+            padding: 30px 20px;
+            background: rgba(0,0,0,0.2);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            text-align: center;
+        }
+        .u-avatar {
+            width: 80px; height: 80px;
+            background: #fff; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
-            transition: 0.3s;
+            color: var(--sidebar-bg); font-size: 1.5rem; flex-shrink: 0;
+            overflow: hidden; border: 2px solid rgba(255,255,255,0.1);
+            margin: 0 auto 15px;
         }
-        .btn-power:hover { background: #FFCC00; color: #800000; transform: rotate(90deg); }
-
-        /* 4. FLUID MAIN CONTAINER */
-        .main-content-wrapper { flex: 1; width: 100%; padding: 1.5rem 0; }
-
-        .alert { border-radius: 15px; animation: fadeInDown 0.5s ease-out; }
-        .fw-black { font-weight: 900; }
-        
-        @keyframes fadeInDown {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
+        .u-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .u-info { line-height: 1.3; overflow: hidden; width: 100%; }
+        .u-name { font-weight: 800; font-size: 0.95rem; color: #fff; margin-bottom: 4px; }
+        .u-designation { font-size: 0.7rem; color: var(--ispsc-yellow); font-weight: 700; text-transform: uppercase; margin-bottom: 8px; display: block; }
+        .btn-edit-profile { 
+            font-size: 10px; font-weight: 800; color: #fff; 
+            text-decoration: none; background: rgba(255,255,255,0.1); 
+            padding: 5px 12px; border-radius: 20px; transition: 0.2s; 
         }
 
-        /* 5. FIX FOR FOOTER HEIGHT */
-        .academic-footer {
-            background-color: #ffffff;
-            border-top: 1px solid #eef0f2;
-            padding: 20px 0; /* Shrunk padding from py-5 */
-            margin-top: auto;
+        #sidebar .nav-list { padding: 15px 0; list-style: none; flex: 1; overflow-y: auto; }
+        #sidebar .nav-item { padding: 3px 20px; }
+        #sidebar .nav-link {
+            color: rgba(255,255,255,0.6);
+            font-weight: 600;
+            padding: 12px 15px;
+            border-radius: 8px;
+            display: flex; align-items: center;
+            text-decoration: none; transition: 0.2s;
         }
-           /* SECURITY MODAL HUB REFINEMENTS */
-    #changePasswordModal .modal-content {
-        border: 1px solid #eef0f2;
-        border-radius: 12px;
-        box-shadow: 0 20px 40px rgba(0,0,0,0.12);
-    }
+        #sidebar .nav-link i { width: 30px; font-size: 1.1rem; }
+        #sidebar .nav-link:hover { color: #fff; background: rgba(255,255,255,0.05); }
+        #sidebar .nav-link.active { background: var(--ispsc-maroon); color: #fff; }
 
-    #changePasswordModal .modal-header {
-        background-color: #f8f9fa; /* Ghost white for academic minimalism */
-        border-bottom: 1px solid #eef0f2;
-        padding: 20px 30px;
-    }
+        /* 2. CONTENT AREA */
+        #content { 
+            flex: 1; 
+            margin-left: var(--sidebar-width); 
+            min-height: 100vh; 
+            display: flex; 
+            flex-direction: column; 
+            width: calc(100% - var(--sidebar-width)); 
+            transition: all 0.3s ease;
+        }
 
-    #changePasswordModal .modal-title {
-        color: #800000;
-        font-weight: 800;
-        font-size: 0.85rem;
-        letter-spacing: 1.5px;
-        text-transform: uppercase;
-    }
+        /* Mobile header logic */
+        .mobile-top-bar {
+            display: none;
+            background: #fff;
+            padding: 12px 20px;
+            border-bottom: 1px solid #e1e8ed;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
 
-    #changePasswordModal .form-label {
-        font-size: 0.65rem;
-        font-weight: 800;
-        color: #94a3b8; /* Slate grey labels */
-        margin-bottom: 8px;
-        letter-spacing: 0.5px;
-    }
+        .academic-footer { padding: 25px 0; border-top: 1px solid #e1e8ed; background: #fff; margin-top: auto; }
 
-    #changePasswordModal .form-control {
-        border: 1.5px solid #e2e8f0;
-        padding: 12px 15px;
-        font-size: 0.9rem;
-        transition: all 0.2s ease;
-        background-color: #fff;
-    }
+        /* 3. RESPONSIVE BREAKPOINTS */
+        @media (max-width: 1199px) {
+            :root { --sidebar-width: 85px; }
+            .u-info, .brand-text, .brand-sub, #sidebar span { display: none; }
+            .sidebar-user, .sidebar-header { justify-content: center !important; padding: 20px 0 !important; }
+            .u-avatar { width: 50px; height: 50px; margin-bottom: 0; }
+            #sidebar .nav-link { justify-content: center; }
+            #sidebar .nav-link i { margin: 0 !important; }
+        }
 
-    #changePasswordModal .form-control:focus {
-        border-color: #800000;
-        box-shadow: 0 0 0 4px rgba(128, 0, 0, 0.05);
-        outline: none;
-    }
+        @media (max-width: 767px) {
+            :root { --sidebar-width: 0px; }
+            #sidebar { left: -300px; width: 280px; }
+            #sidebar.active { left: 0; }
+            #content { margin-left: 0; width: 100%; }
+            .mobile-top-bar { display: flex; }
+            #sidebar.active .u-info, #sidebar.active .brand-text, #sidebar.active .brand-sub, #sidebar.active span { display: block; }
+            #sidebar.active .sidebar-header { padding: 30px 25px; text-align: left; }
+            #sidebar.active .sidebar-user { padding: 30px 20px; text-align: center; }
+            #sidebar.active .u-avatar { width: 80px; height: 80px; margin: 0 auto 15px; }
+            #sidebar.active .nav-link { justify-content: flex-start; padding: 12px 20px; }
+        }
 
-    #changePasswordModal .btn-save-security {
-        background-color: #800000;
-        border: none;
-        color: white;
-        padding: 15px;
-        font-weight: 800;
-        font-size: 0.85rem;
-        letter-spacing: 1px;
-        border-radius: 8px;
-        width: 100%;
-        transition: 0.3s;
-    }
+        #sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1040;
+        }
+        #sidebar-overlay.active { display: block; }
 
-    #changePasswordModal .btn-save-security:hover {
-        background-color: #600000;
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(128, 0, 0, 0.2);
-    }
+        /* 4. MODAL FIX: Audit Trail responsiveness & Sidebar overlap */
+        @media (min-width: 1200px) {
+            .modal, .modal-backdrop { left: var(--sidebar-width) !important; width: calc(100% - var(--sidebar-width)) !important; }
+        }
+
+        .modal-body .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .audit-table { min-width: 850px !important; table-layout: fixed; }
+        .audit-table td { white-space: normal !important; word-break: break-word !important; }
+
+        .modal-content { border-radius: 12px; border: none; overflow: hidden; }
+        .form-control { border: 2px solid #e1e8ed; padding: 12px; border-radius: 8px; font-size: 14px; }
+        .btn-maroon { background: var(--ispsc-maroon); color: #fff; border: none; font-weight: 800; }
 
         @stack('css')
     </style>
 </head>
 <body>
 
-    <nav class="navbar navbar-expand-lg navbar-dark navbar-ispsc sticky-top shadow-sm">
-        <div class="container-fluid px-lg-4">
-            @php
-                if(Auth::check()){
-                    $userNotifications = \App\Models\Notification::where('user_id', Auth::id())->latest()->take(5)->get();
-                }
-            @endphp
+    <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
 
-            <a class="navbar-brand d-flex align-items-center" href="{{ route('dashboard') }}">
-                <div class="brand-section d-none d-sm-block">
-                    <span class="brand-text">DocuRoute</span>
-                    <span class="brand-sub d-block">ISPSC | ONWARDS UIP</span>
-                </div>
-            </a>
+    <!-- 1. SIDEBAR -->
+    <nav id="sidebar">
+        <div class="sidebar-header">
+            <span class="brand-text">DocuRoute</span>
+            <span class="brand-sub d-block">ISPSC ONWARDS UIP</span>
+        </div>
 
-            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#ispscMainNav">
-                <i class="fa fa-bars text-white"></i>
-            </button>
-
-            <div class="collapse navbar-collapse" id="ispscMainNav">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item"><a class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" href="{{ route('dashboard') }}"><i class="fa-solid fa-layer-group"></i> DASHBOARD</a></li>
-                    @if(Auth::user() && Auth::user()->role === 'superadmin')
-                    <li class="nav-item"><a class="nav-link {{ request()->routeIs('admin.personnel') ? 'active' : '' }}" href="{{ route('admin.personnel') }}"><i class="fa-solid fa-users-gear"></i> PERSONNEL</a></li>
-                    @endif
-               </ul>
-
-                <div class="d-flex align-items-center border-start border-white border-opacity-10 ps-3">
-                    @if(Auth::check())
-                    <div class="dropdown me-3">
-                        <a href="#" class="text-decoration-none d-flex align-items-center gap-3" data-bs-toggle="dropdown">
-                            <div class="user-profile-meta d-none d-md-block">
-                                <div class="u-name">{{ strtoupper(Auth::user()->username) }}</div>
-                            </div>
-                            <i class="fa fa-caret-down text-white opacity-50"></i>
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end border-0 shadow-lg mt-3">
-                            <li><a class="dropdown-item fw-bold py-3" href="#" data-bs-toggle="modal" data-bs-target="#changePasswordModal"><i class="fa fa-shield-halved me-2"></i> SECURITY</a></li>
-                        </ul>
-                    </div>
-
-                    <form method="POST" action="{{ route('logout') }}" class="m-0">
-                        @csrf
-                        <button type="submit" class="btn btn-sm btn-power"><i class="fa fa-power-off"></i></button>
-                    </form>
-                    @endif
-                </div>
+        @if(Auth::check())
+        <div class="sidebar-user d-flex flex-column align-items-center">
+            <div class="u-avatar shadow-sm">
+                @if(Auth::user()->avatar)
+                    <img src="{{ asset('storage/' . Auth::user()->avatar) }}" alt="Profile">
+                @else
+                    <i class="fa fa-user" style="margin-top: 20px; display: block;"></i>
+                @endif
             </div>
+            <div class="u-info">
+                <span class="u-designation">{{ Auth::user()->role === 'superadmin' ? 'Records Head' : 'Staff' }}</span>
+                <div class="u-name">{{ Auth::user()->username }}</div>
+                <div class="text-white-50 small mb-2" style="font-size: 11px;">{{ Auth::user()->office->office_name ?? 'RECORDS' }}</div>
+                <a href="#" data-bs-toggle="modal" data-bs-target="#editProfileModal" class="btn-edit-profile">
+                    <i class="fa fa-cog me-1"></i> EDIT PROFILE
+                </a>
+            </div>
+        </div>
+        @endif
+
+        <ul class="nav-list">
+            <li class="nav-item">
+                <a href="{{ route('dashboard') }}" class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
+                    <i class="fa fa-th-large"></i> <span>Dashboard</span>
+                </a>
+            </li>
+            @if(Auth::user() && Auth::user()->role === 'superadmin')
+            <li class="nav-item">
+                <a href="{{ route('admin.personnel') }}" class="nav-link {{ request()->routeIs('admin.personnel') ? 'active' : '' }}">
+                    <i class="fa fa-users-cog"></i> <span>Personnel</span>
+                </a>
+            </li>
+            @endif
+            <li class="nav-item">
+                <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
+                    <i class="fa fa-shield-alt"></i> <span>Security</span>
+                </a>
+            </li>
+        </ul>
+
+        <div class="sidebar-footer p-4 text-center">
+            <form method="POST" action="{{ route('logout') }}">
+                @csrf
+                <button type="submit" class="btn btn-link text-white text-decoration-none p-0 fw-bold opacity-50 small">
+                    <i class="fa fa-sign-out-alt me-2"></i> <span>Sign Out</span>
+                </button>
+            </form>
         </div>
     </nav>
 
-    <div class="main-content-wrapper">
-        <div class="container-fluid px-lg-5">
-            {{-- Messages (Simplified for brevity) --}}
-            @if(session('msg'))<div class="alert alert-success border-0 shadow-sm mb-4" style="border-left: 10px solid #198754 !important;">{{ session('msg') }}</div>@endif
-            @if(session('error'))<div class="alert alert-danger border-0 shadow-sm mb-4" style="border-left: 10px solid #dc3545 !important;">{{ session('error') }}</div>@endif
+    <!-- 2. CONTENT AREA -->
+    <div id="content">
+        <div class="mobile-top-bar">
+            <button class="btn btn-dark" onclick="toggleSidebar()">
+                <i class="fa fa-bars"></i>
+            </button>
+            <span class="fw-bold text-maroon" style="letter-spacing: 1px;">DOCUROUTE</span>
+            <div style="width: 40px;"></div>
         </div>
-        @yield('content')
+
+        <main class="flex-grow-1 mt-4">
+            <div class="container-fluid px-lg-5">
+                @if(session('msg'))
+                    <div class="alert alert-success border-0 shadow-sm animate__animated animate__fadeInDown">
+                        <i class="fa fa-check-circle me-2"></i> {{ session('msg') }}
+                    </div>
+                @endif
+                @if(session('error'))
+                    <div class="alert alert-danger border-0 shadow-sm animate__animated animate__fadeInDown">
+                        <i class="fa fa-triangle-exclamation me-2"></i> {{ session('error') }}
+                    </div>
+                @endif
+            </div>
+            @yield('content')
+        </main>
+
+        <footer class="academic-footer text-center">
+            <div class="container-fluid px-4">
+                <div class="fw-bold text-muted small text-uppercase">Ilocos Sur Polytechnic State College | Onwards UIP</div>
+                <div class="fw-black mt-1" style="color: var(--ispsc-maroon); font-size: 13px; letter-spacing: 2px;">DOCUROUTE | 2026</div>
+            </div>
+        </footer>
     </div>
 
-    <!-- THE SLIM FOOTER -->
-    <footer class="academic-footer text-center">
-        <div class="container">
-            <div class="small fw-bold text-dark opacity-75">ILOCOS SUR POLYTECHNIC STATE COLLEGE</div>
-            <div class="text-uppercase fw-bold opacity-50" style="color: var(--ispsc-maroon); letter-spacing: 1px; font-size: 0.65rem;">
-                DocuRoute &bull; ONWARDS UIP &bull; &copy; {{ date('Y') }}
-            </div>
-        </div>
-    </footer>
-
-<!-- UPDATED PASSWORD MODAL -->
-<div class="modal fade" id="changePasswordModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" style="max-width: 450px;">
-        <div class="modal-content">
-            <div class="modal-header d-flex justify-content-between align-items-center">
-                <h6 class="modal-title mb-0"><i class="fa fa-shield-halved me-2"></i> Update Security Hub</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" style="font-size: 0.7rem;"></button>
-            </div>
-            <form action="{{ route('profile.password.update') }}" method="POST">
-                @csrf
-                <div class="modal-body p-4">
-                    <!-- Current -->
-                    <div class="mb-4">
-                        <label class="form-label text-uppercase">Existing Password</label>
-                        <input type="password" name="current_password" class="form-control" placeholder="Enter your current password" required>
-                    </div>
-
-                    <div class="row g-3">
-                        <!-- New -->
-                        <div class="col-6">
-                            <label class="form-label text-uppercase">New Password</label>
-                            <input type="password" name="password" class="form-control" placeholder="Min. 8 chars" required>
+    <!-- MODAL: CHANGE PASSWORD -->
+    <div class="modal fade" id="changePasswordModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+            <div class="modal-content shadow-lg">
+                <div class="modal-header border-bottom p-4">
+                    <h6 class="modal-title fw-black text-uppercase m-0">Security Settings</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form action="{{ route('profile.password.update') }}" method="POST">
+                    @csrf
+                    <div class="modal-body p-4">
+                        <div class="mb-3">
+                            <label class="form-label">Current Password</label>
+                            <input type="password" name="current_password" class="form-control" required>
                         </div>
-                        <!-- Confirm -->
-                        <div class="col-6">
-                            <label class="form-label text-uppercase">Verify Password</label>
-                            <input type="password" name="password_confirmation" class="form-control" placeholder="Confirm new password" required>
+                        <div class="mb-3">
+                            <label class="form-label">New Password</label>
+                            <input type="password" name="password" class="form-control" required>
+                        </div>
+                        <div class="mb-0">
+                            <label class="form-label">Confirm New Password</label>
+                            <input type="password" name="password_confirmation" class="form-control" required>
                         </div>
                     </div>
-                </div>
-                <div class="p-4 pt-0">
-                    <button type="submit" class="btn-save-security text-uppercase">
-                        Save Security Changes <i class="fa fa-arrow-right ms-2 small"></i>
-                    </button>
-                </div>
-            </form>
+                    <div class="p-4 pt-0">
+                        <button type="submit" class="btn btn-maroon w-100 py-3 small text-uppercase">Update Security</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
-</div>
+
+    <!-- MODAL: EDIT PROFILE -->
+    <div class="modal fade" id="editProfileModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+            <div class="modal-content shadow-lg">
+                <div class="modal-header border-bottom p-4">
+                    <h6 class="modal-title fw-black text-uppercase m-0">Edit Profile</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form action="{{ route('profile.update') }}" method="POST" enctype="multipart/form-data">
+                    @csrf
+                    <div class="modal-body p-4">
+                        <div class="text-center mb-4">
+                            <div id="avatar-preview-box" class="mx-auto shadow-sm border mb-3" style="width: 110px; height: 110px; border-radius: 50%; overflow: hidden; background: #f8f9fa; display: flex; align-items: center; justify-content: center;">
+                                @if(Auth::user()->avatar)
+                                    <img src="{{ asset('storage/' . Auth::user()->avatar) }}" style="width: 100%; height: 100%; object-fit: cover;">
+                                @else
+                                    <i class="fa fa-user fa-3x text-muted"></i>
+                                @endif
+                            </div>
+                            <label for="avatar-input" class="btn btn-sm btn-outline-dark fw-bold" style="font-size: 11px;">CHANGE PICTURE</label>
+                            <input type="file" name="avatar" id="avatar-input" class="d-none" accept="image/*" onchange="previewImage(this)">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Display Name</label>
+                            <input type="text" name="username" class="form-control" value="{{ Auth::user()->username }}" required>
+                        </div>
+                    </div>
+                    <div class="p-4 pt-0">
+                        <button type="submit" class="btn btn-maroon w-100 py-3 small text-uppercase">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('active');
+            document.getElementById('sidebar-overlay').classList.toggle('active');
+        }
+
+        function previewImage(input) {
+            if (input.files && input.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('avatar-preview-box').innerHTML = 
+                        `<img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover;">`;
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+    </script>
     @stack('scripts')
 </body>
 </html>

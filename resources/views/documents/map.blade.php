@@ -3,95 +3,58 @@
 @section('title', 'Signature Placement')
 
 @section('content')
-<div class="container-fluid py-4">
-    @if($document->is_hard_copy)
-        {{-- Logic for Hard Copy: Inform user and redirect --}}
-        <div class="alert alert-warning shadow border-0 text-center py-5">
-            <i class="fa fa-box fa-4x mb-3 text-maroon opacity-50"></i>
-            <h3 class="fw-bold">Physical Item Tracking</h3>
-            <p>This document is marked as a Hard Copy. Signature placement is not required.</p>
-            <a href="{{ route('dashboard') }}" class="btn btn-maroon px-5">Return to Dashboard</a>
-        </div>
-    @else
-        <div class="row">
-            <!-- SIDEBAR -->
-            <div class="col-lg-3">
-                <div class="card shadow-sm border-0 sticky-top" style="top: 20px;">
-                    <div class="card-header bg-maroon text-white py-3 text-center">
-                        <h5 class="mb-0 fw-bold text-uppercase small" style="letter-spacing: 1px;">
-                            <i class="fa fa-map-marker-alt me-2"></i> Placement Tool
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="alert alert-info py-2 small mb-3 border-0">
-                            1. Select a signatory.<br>
-                            2. Scroll to the correct page.<br>
-                            3. Click the document to place tag.
-                        </div>
-
-<div class="list-group list-group-flush mb-4" id="signatoryList" style="max-height: 300px; overflow-y: auto;">
-    @foreach($document->signatories as $sig)
-        <button type="button" 
-                class="list-group-item list-group-item-action signatory-btn d-flex justify-content-between align-items-center border-bottom" 
-                data-user-id="{{ $sig->user_id }}">
-            
-            {{-- Name and Icon Wrapper --}}
-            <span class="small fw-bold">
-                <i class="fa fa-user-circle me-2"></i> {{ $sig->user->username }}
-            </span>
-
-            {{-- The Checkmark Badge (Hidden by default unless x_pos exists) --}}
-            <span class="badge rounded-circle {{ $sig->x_pos ? '' : 'd-none' }}" id="check-{{ $sig->user_id }}">
-                <i class="fa fa-check"></i>
-            </span>
-            
-        </button>
-    @endforeach
-</div>
-
-                        <!-- Inside map.blade.php -->
-                        <button id="btn-finalize" class="btn btn-success w-100 mb-2 py-3 fw-bold">
-                            DONE & FINALIZE <i class="fa fa-check-circle ms-1"></i>
-                        </button>
-                        <button type="button" onclick="cancelMapping(event)" class="btn btn-outline-danger w-100 fw-bold py-2 shadow-sm">
-                            CANCEL & DISCARD <i class="fa fa-trash-alt ms-1"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- PDF VIEWER -->
-            <div class="col-lg-9">
-                <div class="card shadow-lg border-0">
-                    <div class="card-header bg-white d-flex justify-content-between align-items-center py-2 border-bottom">
-                        <span class="fw-bold text-muted small text-uppercase">Document: {{ $document->title }}</span>
-                        <span id="page-info" class="badge bg-dark">Preparing PDF...</span>
-                    </div>
-                    <!-- Fluid container for rendering -->
-                    <div id="pdf-viewer-container" class="card-body p-4 bg-secondary d-flex flex-column align-items-center" style="min-height: 85vh; overflow-y: auto;">
-                        <div id="loader-spinner" class="text-center text-white mt-5">
-                            <div class="spinner-border mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
-                            <h5 class="fw-bold">Rendering Document...</h5>
-                            <p class="small opacity-75">This may take a few seconds for larger files.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    @endif
-</div>
-
 <style>
-    :root { --ispsc-maroon: #800000; }
-    .bg-maroon { background-color: var(--ispsc-maroon) !important; }
-    .text-maroon { color: var(--ispsc-maroon) !important; }
+    :root { 
+        --ispsc-maroon: #800000; 
+        --ispsc-yellow: #FFCC00;
+        --bg-pro-grey: #525659;
+    }
+
+    .main-content-fluid { width: 100%; padding: 0 40px; }
+
+    .tracer-card { 
+        background: #fff; border: 1px solid #e1e8ed; border-radius: 12px; 
+        margin-bottom: 25px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); overflow: hidden; 
+    }
+    .tracer-card-header { 
+        padding: 15px 25px; border-bottom: 1px solid #f1f1f1; 
+        display: flex; justify-content: space-between; align-items: center; background: #fff; 
+    }
+    .tracer-card-header h6 { margin: 0; font-weight: 800; color: #000; text-transform: uppercase; font-size: 13px; }
+
+    #signatoryList .signatory-btn {
+        background-color: #fff !important;
+        color: #333 !important;
+        border: 1px solid #e1e8ed !important;
+        margin-bottom: 8px;
+        padding: 15px;
+        border-radius: 10px !important;
+        font-size: 14px;
+        transition: 0.2s;
+    }
+    #signatoryList .signatory-btn.active {
+        background-color: var(--ispsc-yellow) !important;
+        color: var(--ispsc-maroon) !important;
+        border: 2px solid var(--ispsc-maroon) !important;
+        font-weight: 800;
+    }
+
+    #pdf-viewer-container {
+        background-color: var(--bg-pro-grey);
+        padding: 40px;
+        min-height: 85vh;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
 
     .pdf-page-wrapper {
         position: relative !important;
-        margin-bottom: 40px;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        margin-bottom: 30px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.4);
         background: white;
-        display: inline-block;
+        user-select: none; /* Prevent text selection while dragging */
     }
 
     .marker-overlay {
@@ -105,74 +68,85 @@
         position: absolute !important;
         width: 150px; height: 60px;
         background: rgba(255, 204, 0, 0.95);
-        border: 2px dashed #800000;
-        border-radius: 4px;
+        border: 2px dashed var(--ispsc-maroon);
+        border-radius: 6px;
         transform: translate(-50%, -50%);
         z-index: 100;
         display: flex; flex-direction: column; justify-content: center; align-items: center;
-        pointer-events: all; cursor: grab; color: #800000;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        cursor: grab; color: var(--ispsc-maroon);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        pointer-events: all;
     }
+    .sig-marker:active { cursor: grabbing; }
 
     .btn-delete-tag {
-        position: absolute; top: -10px; right: -10px;
+        position: absolute; top: -12px; right: -12px;
         background: #dc3545; color: white; border: none;
-        width: 24px; height: 24px; border-radius: 50%;
-        font-size: 14px; line-height: 1; z-index: 110;
-        cursor: pointer; display: flex; align-items: center; justify-content: center;
+        width: 26px; height: 26px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer;
     }
 
-    .signatory-btn.active { 
-        background-color: #800000 !important; 
-        color: #FFCC00 !important; 
-        border-color: #800000 !important;
-    }
-        /* SIGNATORY LIST STYLING */
-    #signatoryList .signatory-btn {
-        background-color: #fff9e6 !important; /* Light Yellow Base */
-        color: #800000 !important; /* Maroon Text */
-        border: 1px solid #ffcc00 !important;
-        margin-bottom: 5px;
-        border-radius: 6px !important;
-        transition: all 0.2s ease;
-    }
-
-    /* HOVER STATE */
-    #signatoryList .signatory-btn:hover {
-        background-color: #ffe082 !important;
-        border-color: #800000 !important;
-    }
-
-    /* ACTIVE STATE (When selected to place a tag) */
-    #signatoryList .signatory-btn.active {
-        background-color: #FFCC00 !important; /* Solid ISPSC Yellow */
-        color: #800000 !important;
-        border: 2px solid #800000 !important;
-        font-weight: 800 !important;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    }
-
-    /* Fix for the icon inside the button */
-    #signatoryList .signatory-btn i {
-        color: #800000 !important;
-    }
-
-    /* The Checkmark Badge */
-    #signatoryList .badge.bg-success {
-        background-color: #800000 !important; /* Maroon background for check */
-        color: #FFCC00 !important; /* Yellow checkmark */
-    }
-    #signatoryList .badge i {
-    color: #ffffff !important; /* Double-ensure the icon is white */
-    display: block;
-}
-
-/* Make sure the text doesn't overlap the badge */
-.signatory-btn span:first-child {
-    flex-grow: 1;
-    text-align: left;
-}
+    .btn-finalize { background: #198754; color: #fff; border-radius: 10px; font-weight: 800; padding: 15px; border:none; text-transform: uppercase; font-size: 14px; }
+    .btn-discard { background: transparent; color: #dc3545; border: 2px solid #dc3545; border-radius: 10px; font-weight: 800; padding: 10px; text-transform: uppercase; font-size: 12px; margin-top: 10px; }
 </style>
+
+<div class="main-content-fluid py-4">
+    <div class="row g-4">
+        <!-- SIDEBAR TOOLBOX -->
+        <div class="col-lg-3">
+            <div class="tracer-card sticky-top" style="top: 90px;">
+                <div class="tracer-card-header bg-maroon">
+                    <h6 class="text-white mb-0">Placement Tool</h6>
+                </div>
+                <div class="card-body p-4">
+                    <div class="alert alert-light border small mb-4" style="font-size: 13px;">
+                        <i class="fa fa-info-circle text-primary me-2"></i>
+                        1. Select a signatory.<br>
+                        2. Click PDF to place tag.<br>
+                        3. Drag tag to move it.
+                    </div>
+
+                    <div class="list-group list-group-flush mb-4" id="signatoryList" style="max-height: 400px; overflow-y: auto;">
+                        @foreach($document->signatories as $sig)
+                            <button type="button" class="list-group-item list-group-item-action signatory-btn d-flex justify-content-between align-items-center" data-user-id="{{ $sig->user_id }}">
+                                <span><i class="fa fa-user-circle me-2 opacity-50"></i> {{ $sig->user->username }}</span>
+                                <span class="badge bg-maroon rounded-circle {{ $sig->x_pos ? '' : 'd-none' }}" id="check-{{ $sig->user_id }}">
+                                    <i class="fa fa-check p-1" style="font-size: 8px;"></i>
+                                </span>
+                            </button>
+                        @endforeach
+                    </div>
+
+                    <button id="btn-finalize" class="btn-finalize w-100 shadow-sm">
+                        FINALIZE MAPPING <i class="fa fa-check-circle ms-1"></i>
+                    </button>
+                    
+                    <button type="button" onclick="cancelMapping(event)" class="btn-discard w-100">
+                        CANCEL & DISCARD
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- PDF DISPLAY AREA -->
+        <div class="col-lg-9">
+            <div class="tracer-card shadow-lg">
+                <div class="tracer-card-header">
+                    <h6 class="text-muted"><i class="fa fa-file-pdf me-2 text-maroon"></i> {{ strtoupper($document->title) }}</h6>
+                    <span id="page-info" class="badge bg-dark">Loading...</span>
+                </div>
+                
+                <div id="pdf-viewer-container">
+                    <div id="loader-spinner" class="text-center text-white mt-5">
+                        <div class="spinner-border mb-3" role="status"></div>
+                        <h5 class="fw-bold">Generating View...</h5>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')

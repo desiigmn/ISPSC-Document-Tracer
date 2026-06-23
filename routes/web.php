@@ -52,7 +52,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/store', [DocumentController::class, 'store'])->name('documents.store');
         Route::delete('/delete/{id}', [DocumentController::class, 'destroy'])->name('documents.delete');
 
-        // --- 3. DOCUMENT ACTIONS (Supports Tracking IDs with slashes) ---
+        // --- 3. DOCUMENT ACTIONS ---
         Route::post('/sign/{id}', [DocumentController::class, 'sign'])
             ->name('documents.sign')
             ->where('id', '.*');
@@ -100,6 +100,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // 5. USER PROFILE & UTILITIES
     Route::post('/profile/change-password', [StaffController::class, 'changeOwnPassword'])->name('profile.password.update');
+    Route::post('/profile/update', [DashboardController::class, 'updateProfile'])->name('profile.update');
 
     Route::get('/test-mail', function() {
         $doc = \App\Models\Document::first();
@@ -109,6 +110,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         }
         return "No documents found to test.";
     });
-});
+
+}); // <--- THIS WAS MISSING: Closes the group started on line 19
 
 require __DIR__.'/auth.php';
