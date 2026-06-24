@@ -78,18 +78,29 @@ class DashboardController extends Controller
                            ->paginate(40)
                            ->appends($request->all());
 
-        // 5. CALCULATE COUNTS FOR CARDS
-        $countReview = (clone $baseQuery)->where('status', 'needs_review')->count();
-        $countPending = (clone $baseQuery)->whereIn('status', ['mapping', 'pending', 'returned'])->count();
-        $countFinished = (clone $baseQuery)->where('status', 'accepted')->count();
+            // --- 5. CALCULATE COUNTS FOR CARDS ---
 
-        // FIX: Shared Count logic must match the filter logic
-        $countShared = (clone $baseQuery)->whereHas('logs', function($sub) use ($user, $isAdminOrRecords) {
-            $sub->where('action', 'DISSEMINATED');
-            if (!$isAdminOrRecords) {
-                $sub->where('office_id', $user->office_id);
-            }
-        })->count();
+            // 1. Count items needing priority (Unchanged)
+            $countReview = (clone $baseQuery)->where('status', 'needs_review')->count();
+
+            // 2. Count On Process items (Unchanged)
+            $countPending = (clone $baseQuery)->whereIn('status', ['mapping', 'pending', 'returned'])->count();
+
+            // 3. FIX: Count Shared Copies (Received Shares)
+            $countShared = (clone $baseQuery)->whereHas('logs', function($sub) use ($user) {
+                $sub->where('action', 'DISSEMINATED');
+                // If not admin, only count what was shared to THEIR office
+                if ($user->role !== 'superadmin' && !str_contains($user->office_id, '-REC-')) {
+                    $sub->where('office_id', $user->office_id);
+                }
+            })->count();
+
+            // 4. FIX: Count Completed/Finished (ONLY those NOT shared)
+            // We subtract the shared ones so the numbers match the table categories
+            $countFinished = (clone $baseQuery)->where('status', 'accepted')
+                ->whereDoesntHave('logs', function($sub) {
+                    $sub->where('action', 'DISSEMINATED');
+                })->count();
 
         return view('dashboard', compact(
             'documents', 

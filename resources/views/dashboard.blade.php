@@ -128,8 +128,6 @@
 
     <div class="row align-items-center mb-4 g-3">
         <div class="col-lg-4">
-            <h4 class="fw-black mb-0">Dashboard</h4>
-            <small class="text-muted fw-bold">Office: {{ strtoupper($currUser->office->office_name ?? 'SYSTEM') }}</small>
         </div>
         <div class="col-lg-8 d-flex justify-content-lg-end align-items-center flex-wrap gap-2 header-actions-wrap">
             <form action="{{ route('dashboard') }}" method="GET" class="search-container">
@@ -159,7 +157,7 @@
     <div class="row g-0">
         <div class="col-12">
             <div class="tracer-card">
-                <div class="tracer-card-header"><h6>Document Registry Ledger</h6></div>
+                <div class="tracer-card-header"><h6>Document Registry</h6></div>
                 <div class="table-responsive">
                     <table class="table align-middle mb-0" style="min-width: 800px;">
                         <thead>

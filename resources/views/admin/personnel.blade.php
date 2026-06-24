@@ -63,6 +63,19 @@
 @endpush
 
 @section('content')
+@php
+    // Mapping campus codes to names for the table display
+    $campusNames = [
+        '0001' => 'MAIN',
+        '0010' => 'CANDON',
+        '0011' => 'SANTIAGO',
+        '0100' => 'STA MARIA',
+        '0101' => 'TAGUDIN',
+        '0110' => 'NARVACAN',
+        '0111' => 'CERVANTES',
+    ];
+@endphp
+
 <div class="main-content-fluid py-4">
     
     <!-- HEADER SECTION -->
@@ -154,11 +167,13 @@
                             <tr>
                                 <th class="ps-4">PERSONNEL / ACCOUNT EMAIL</th>
                                 <th>OFFICE</th>
+                                <th>CAMPUS</th>
                                 <th class="text-end pe-4">ACTIONS</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($allUsers as $u)
+                            {{-- Sorting by campus_code ensures 0001 (Main) comes first, then 0010, 0011, etc. --}}
+                            @foreach($allUsers->sortBy('campus_code') as $u)
                             <tr class="ledger-row">
                                 <td class="ps-4">
                                     <div class="fw-bold text-dark">{{ $u->username }}</div>
@@ -166,6 +181,11 @@
                                 </td>
                                 <td>
                                     <span class="small fw-bold text-muted">{{ $u->office->office_name ?? 'NOT ASSIGNED' }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark border fw-bold" style="font-size: 11px;">
+                                        {{ $campusNames[$u->campus_code] ?? 'N/A' }}
+                                    </span>
                                 </td>
                                 <td class="text-end pe-4">
                                     <div class="d-flex justify-content-end gap-2">

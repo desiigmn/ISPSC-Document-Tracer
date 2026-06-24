@@ -33,19 +33,19 @@
             overflow-x: hidden;
         }
 
-        /* 1. SIDEBAR & BRANDING */
+        /* 1. SIDEBAR SYSTEM */
         #sidebar {
             width: var(--sidebar-width);
             height: 100vh;
             background: var(--sidebar-bg);
             position: fixed;
             left: 0; top: 0;
-            z-index: 1100;
+            z-index: 1040; /* Lower than Modal (1050) */
             display: flex;
             flex-direction: column;
             color: #fff;
             box-shadow: 2px 0 10px rgba(0,0,0,0.1);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.3s ease-in-out;
         }
 
         .sidebar-header { padding: 40px 35px; border-bottom: 1px solid rgba(255,255,255,0.05); }
@@ -91,16 +91,21 @@
         #sidebar .nav-link:hover { color: #fff; background: rgba(255,255,255,0.05); }
         #sidebar .nav-link.active { background: var(--ispsc-maroon); color: #fff; }
 
-        /* 2. CONTENT AREA */
+        /* 2. MAIN CONTENT WRAPPER */
         #content { 
             flex: 1; 
             margin-left: var(--sidebar-width); 
             min-height: 100vh; 
             display: flex; 
             flex-direction: column; 
-            width: calc(100% - var(--sidebar-width)); 
+            width: 100%; 
             transition: all 0.3s ease;
         }
+
+        /* 3. MODAL CRITICAL FIXES */
+        /* Ensure modals are always on top of the sidebar */
+        .modal { z-index: 2000 !important; }
+        .modal-backdrop { z-index: 1950 !important; }
 
         /* Mobile header logic */
         .mobile-top-bar {
@@ -117,7 +122,7 @@
 
         .academic-footer { padding: 25px 0; border-top: 1px solid #e1e8ed; background: #fff; margin-top: auto; }
 
-        /* 3. RESPONSIVE BREAKPOINTS */
+        /* 4. RESPONSIVE BREAKPOINTS */
         @media (max-width: 1199px) {
             :root { --sidebar-width: 85px; }
             .u-info, .brand-text, .brand-sub, #sidebar span { display: none; }
@@ -129,10 +134,11 @@
 
         @media (max-width: 767px) {
             :root { --sidebar-width: 0px; }
-            #sidebar { left: -300px; width: 280px; }
+            #sidebar { left: -280px; width: 280px; }
             #sidebar.active { left: 0; }
-            #content { margin-left: 0; width: 100%; }
+            #content { margin-left: 0; }
             .mobile-top-bar { display: flex; }
+            
             #sidebar.active .u-info, #sidebar.active .brand-text, #sidebar.active .brand-sub, #sidebar.active span { display: block; }
             #sidebar.active .sidebar-header { padding: 30px 25px; text-align: left; }
             #sidebar.active .sidebar-user { padding: 30px 20px; text-align: center; }
@@ -140,27 +146,20 @@
             #sidebar.active .nav-link { justify-content: flex-start; padding: 12px 20px; }
         }
 
+        /* Overlay for mobile */
         #sidebar-overlay {
             display: none;
             position: fixed;
             inset: 0;
             background: rgba(0,0,0,0.5);
-            z-index: 1040;
+            z-index: 1030;
         }
         #sidebar-overlay.active { display: block; }
 
-        /* 4. MODAL FIX: Audit Trail responsiveness & Sidebar overlap */
-        @media (min-width: 1200px) {
-            .modal, .modal-backdrop { left: var(--sidebar-width) !important; width: calc(100% - var(--sidebar-width)) !important; }
-        }
-
-        .modal-body .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        .audit-table { min-width: 850px !important; table-layout: fixed; }
-        .audit-table td { white-space: normal !important; word-break: break-word !important; }
-
-        .modal-content { border-radius: 12px; border: none; overflow: hidden; }
+        /* Form Utilities for Elder-friendly use */
         .form-control { border: 2px solid #e1e8ed; padding: 12px; border-radius: 8px; font-size: 14px; }
         .btn-maroon { background: var(--ispsc-maroon); color: #fff; border: none; font-weight: 800; }
+        .btn-secondary-outline { background: transparent; border: 2px solid #e1e8ed; color: #666; font-weight: 800; border-radius: 8px; }
 
         @stack('css')
     </style>
@@ -182,7 +181,7 @@
                 @if(Auth::user()->avatar)
                     <img src="{{ asset('storage/' . Auth::user()->avatar) }}" alt="Profile">
                 @else
-                    <i class="fa fa-user" style="margin-top: 20px; display: block;"></i>
+                    <i class="fa fa-user fa-2x" style="margin-top: 20px; color:#444"></i>
                 @endif
             </div>
             <div class="u-info">
@@ -228,13 +227,14 @@
 
     <!-- 2. CONTENT AREA -->
     <div id="content">
-        <div class="mobile-top-bar">
+        <!-- Mobile Header Toggle -->
+        <header class="mobile-top-bar">
             <button class="btn btn-dark" onclick="toggleSidebar()">
                 <i class="fa fa-bars"></i>
             </button>
             <span class="fw-bold text-maroon" style="letter-spacing: 1px;">DOCUROUTE</span>
             <div style="width: 40px;"></div>
-        </div>
+        </header>
 
         <main class="flex-grow-1 mt-4">
             <div class="container-fluid px-lg-5">
