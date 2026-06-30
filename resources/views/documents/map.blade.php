@@ -1,6 +1,6 @@
 @extends('layouts.ispsc')
 
-@section('title', 'Signature Placement')
+@section('title', 'Signature & QR Placement')
 
 @section('content')
 <style>
@@ -22,23 +22,35 @@
     }
     .tracer-card-header h6 { margin: 0; font-weight: 800; color: #000; text-transform: uppercase; font-size: 13px; }
 
-    #signatoryList .signatory-btn {
+    /* Signatory Buttons */
+    .signatory-btn {
         background-color: #fff !important;
         color: #333 !important;
         border: 1px solid #e1e8ed !important;
         margin-bottom: 8px;
-        padding: 15px;
+        padding: 12px 15px;
         border-radius: 10px !important;
-        font-size: 14px;
+        font-size: 13px;
         transition: 0.2s;
+        text-align: left;
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
-    #signatoryList .signatory-btn.active {
+    .signatory-btn.active {
         background-color: var(--ispsc-yellow) !important;
         color: var(--ispsc-maroon) !important;
         border: 2px solid var(--ispsc-maroon) !important;
         font-weight: 800;
     }
+    .qr-btn.active {
+        background-color: #e7f1ff !important;
+        color: #0d6efd !important;
+        border: 2px solid #0d6efd !important;
+    }
 
+    /* PDF Viewer */
     #pdf-viewer-container {
         background-color: var(--bg-pro-grey);
         padding: 40px;
@@ -48,99 +60,110 @@
         flex-direction: column;
         align-items: center;
     }
-
     .pdf-page-wrapper {
         position: relative !important;
         margin-bottom: 30px;
         box-shadow: 0 10px 30px rgba(0,0,0,0.4);
         background: white;
-        user-select: none; /* Prevent text selection while dragging */
     }
-
     .marker-overlay {
         position: absolute;
         top: 0; left: 0; width: 100%; height: 100%;
-        z-index: 10; 
-        cursor: crosshair;
+        z-index: 10; cursor: crosshair;
     }
 
-    .sig-marker {
+    /* Markers */
+    .sig-marker, .qr-marker {
         position: absolute !important;
-        width: 150px; height: 60px;
-        background: rgba(255, 204, 0, 0.95);
-        border: 2px dashed var(--ispsc-maroon);
-        border-radius: 6px;
         transform: translate(-50%, -50%);
         z-index: 100;
-        display: flex; flex-direction: column; justify-content: center; align-items: center;
-        cursor: grab; color: var(--ispsc-maroon);
+        cursor: grab;
         box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        display: flex; flex-direction: column; justify-content: center; align-items: center;
         pointer-events: all;
     }
-    .sig-marker:active { cursor: grabbing; }
+    .sig-marker {
+        width: 140px; height: 55px;
+        background: rgba(255, 204, 0, 0.9);
+        border: 2px dashed var(--ispsc-maroon);
+        border-radius: 6px;
+        color: var(--ispsc-maroon);
+    }
+    .qr-marker {
+        width: 70px; height: 70px;
+        background: white;
+        border: 2px solid #000;
+        border-radius: 4px;
+    }
+    .sig-marker:active, .qr-marker:active { cursor: grabbing; }
 
     .btn-delete-tag {
-        position: absolute; top: -12px; right: -12px;
+        position: absolute; top: -10px; right: -10px;
         background: #dc3545; color: white; border: none;
-        width: 26px; height: 26px; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        cursor: pointer;
+        width: 22px; height: 22px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center; font-size: 10px;
     }
 
-    .btn-finalize { background: #198754; color: #fff; border-radius: 10px; font-weight: 800; padding: 15px; border:none; text-transform: uppercase; font-size: 14px; }
-    .btn-discard { background: transparent; color: #dc3545; border: 2px solid #dc3545; border-radius: 10px; font-weight: 800; padding: 10px; text-transform: uppercase; font-size: 12px; margin-top: 10px; }
+    .btn-finalize { background: #198754; color: #fff; border-radius: 10px; font-weight: 800; padding: 15px; border:none; text-transform: uppercase; }
 </style>
 
 <div class="main-content-fluid py-4">
     <div class="row g-4">
-        <!-- SIDEBAR TOOLBOX -->
+        <!-- TOOLBOX -->
         <div class="col-lg-3">
             <div class="tracer-card sticky-top" style="top: 90px;">
-                <div class="tracer-card-header bg-maroon">
+                <div class="tracer-card-header bg-dark">
                     <h6 class="text-white mb-0">Placement Tool</h6>
                 </div>
                 <div class="card-body p-4">
-                    <div class="alert alert-light border small mb-4" style="font-size: 13px;">
-                        <i class="fa fa-info-circle text-primary me-2"></i>
-                        1. Select a signatory.<br>
-                        2. Click PDF to place tag.<br>
-                        3. Drag tag to move it.
-                    </div>
-
-                    <div class="list-group list-group-flush mb-4" id="signatoryList" style="max-height: 400px; overflow-y: auto;">
+                    
+                    <label class="small fw-bold text-muted text-uppercase mb-2 d-block">Signatories</label>
+                    <div id="signatoryList" class="mb-4">
                         @foreach($document->signatories as $sig)
-                            <button type="button" class="list-group-item list-group-item-action signatory-btn d-flex justify-content-between align-items-center" data-user-id="{{ $sig->user_id }}">
-                                <span><i class="fa fa-user-circle me-2 opacity-50"></i> {{ $sig->user->username }}</span>
-                                <span class="badge bg-maroon rounded-circle {{ $sig->x_pos ? '' : 'd-none' }}" id="check-{{ $sig->user_id }}">
-                                    <i class="fa fa-check p-1" style="font-size: 8px;"></i>
+                            @php
+                                $displayName = $sig->user ? $sig->user->username : ($sig->office->office_name ?? 'Office');
+                                $uniqueId = $sig->id; // Use primary key to avoid null issues
+                            @endphp
+                            <button type="button" class="signatory-btn" data-type="sig" data-id="{{ $uniqueId }}" data-name="{{ $displayName }}">
+                                <span><i class="fa {{ $sig->user ? 'fa-user-circle' : 'fa-building' }} me-2 opacity-50"></i> {{ $displayName }}</span>
+                                <span class="badge bg-maroon rounded-circle {{ $sig->x_pos ? '' : 'd-none' }}" id="check-sig-{{ $uniqueId }}">
+                                    <i class="fa fa-check" style="font-size: 8px;"></i>
                                 </span>
                             </button>
                         @endforeach
                     </div>
 
-                    <button id="btn-finalize" class="btn-finalize w-100 shadow-sm">
+                    <label class="small fw-bold text-muted text-uppercase mb-2 d-block">System Items</label>
+                    <button type="button" class="signatory-btn qr-btn mb-4" data-type="qr" data-id="system-qr">
+                        <span><i class="fa fa-qrcode me-2 opacity-50"></i> Document QR Code</span>
+                        <span class="badge bg-primary rounded-circle {{ $document->qr_x ? '' : 'd-none' }}" id="check-qr">
+                            <i class="fa fa-check" style="font-size: 8px;"></i>
+                        </span>
+                    </button>
+
+                    <button id="btn-finalize" class="btn-finalize w-100 shadow-sm mb-2">
                         FINALIZE MAPPING <i class="fa fa-check-circle ms-1"></i>
                     </button>
                     
-                    <button type="button" onclick="cancelMapping(event)" class="btn-discard w-100">
-                        CANCEL & DISCARD
-                    </button>
+                    <a href="{{ route('documents.discard', $document->id) }}" class="btn btn-outline-danger w-100 fw-bold small py-2">
+                        DISCARD & EXIT
+                    </a>
                 </div>
             </div>
         </div>
 
-        <!-- PDF DISPLAY AREA -->
+        <!-- PDF AREA -->
         <div class="col-lg-9">
             <div class="tracer-card shadow-lg">
                 <div class="tracer-card-header">
                     <h6 class="text-muted"><i class="fa fa-file-pdf me-2 text-maroon"></i> {{ strtoupper($document->title) }}</h6>
-                    <span id="page-info" class="badge bg-dark">Loading...</span>
+                    <span id="page-info" class="badge bg-dark">Loading Document...</span>
                 </div>
                 
                 <div id="pdf-viewer-container">
                     <div id="loader-spinner" class="text-center text-white mt-5">
                         <div class="spinner-border mb-3" role="status"></div>
-                        <h5 class="fw-bold">Generating View...</h5>
+                        <h5 class="fw-bold">Rendering PDF Pages...</h5>
                     </div>
                 </div>
             </div>
@@ -152,31 +175,27 @@
 @push('scripts')
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
 <script>
-    // 1. Setup Variables
     const pdfUrl = "{{ route('documents.stream', $document->id) }}";
-    const signatoriesData = @json($document->signatories); 
-    let selectedUserId = null;
+    const signatoriesData = @json($document->signatories->load(['user', 'office'])); 
+    const docData = @json($document);
+
+    let selectedType = null;
+    let selectedId = null;   // This will hold the Signatory PK ($sig->id)
+    let selectedName = null;
 
     const pdfjsLib = window['pdfjs-dist/build/pdf'];
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-    // 2. Load PDF
-    const loadingTask = pdfjsLib.getDocument(pdfUrl);
-    loadingTask.promise.then(pdf => {
-        const spinner = document.getElementById('loader-spinner');
-        if(spinner) spinner.remove();
+    // Load PDF
+    pdfjsLib.getDocument(pdfUrl).promise.then(pdf => {
+        document.getElementById('loader-spinner')?.remove();
         document.getElementById('page-info').innerText = `Total Pages: ${pdf.numPages}`;
         for (let i = 1; i <= pdf.numPages; i++) { renderPage(pdf, i); }
-
-        // Auto-select first signatory
-        const firstBtn = document.querySelector('.signatory-btn');
-        if(firstBtn) firstBtn.click();
     });
 
     function renderPage(pdf, pageNum) {
         pdf.getPage(pageNum).then(page => {
-            const scale = 1.5;
-            const viewport = page.getViewport({ scale: scale });
+            const viewport = page.getViewport({ scale: 1.5 });
             const wrapper = document.createElement('div');
             wrapper.className = 'pdf-page-wrapper';
             wrapper.style.width = viewport.width + 'px';
@@ -193,96 +212,138 @@
             document.getElementById('pdf-viewer-container').appendChild(wrapper);
             page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport });
 
-            // Load Existing Tags
+            // Render existing markers
             signatoriesData.forEach(sig => {
                 if (sig.x_pos && parseInt(sig.page_num || 1) === pageNum) {
-                    overlay.appendChild(createMarkerHtml(sig.user_id, sig.user.username, sig.x_pos, sig.y_pos));
+                    const name = sig.user ? sig.user.username : (sig.office ? sig.office.office_name : 'Signatory');
+                    overlay.appendChild(createSigMarker(sig.id, name, sig.x_pos, sig.y_pos));
                 }
             });
 
-            // Click to place
+            if (docData.qr_x && parseInt(docData.qr_page || 1) === pageNum) {
+                overlay.appendChild(createQrMarker(docData.qr_x, docData.qr_y));
+            }
+
+            // Click to Place
             overlay.addEventListener('click', function(e) {
-                if (e.target.closest('.sig-marker') || !selectedUserId) return;
-                document.querySelectorAll(`.sig-marker[data-user-id="${selectedUserId}"]`).forEach(el => el.remove());
+                if (e.target.closest('.sig-marker') || e.target.closest('.qr-marker') || !selectedType) return;
+
                 const rect = overlay.getBoundingClientRect();
                 const x = ((e.clientX - rect.left) / viewport.width) * 100;
                 const y = ((e.clientY - rect.top) / viewport.height) * 100;
-                const userName = document.querySelector(`.signatory-btn[data-user-id="${selectedUserId}"] span`).innerText.trim();
-                overlay.appendChild(createMarkerHtml(selectedUserId, userName, x, y));
-                document.getElementById(`check-${selectedUserId}`).classList.remove('d-none');
-                savePosition(selectedUserId, x, y, pageNum);
+
+                if (selectedType === 'sig') {
+                    document.querySelectorAll(`.sig-marker[data-id="${selectedId}"]`).forEach(el => el.remove());
+                    overlay.appendChild(createSigMarker(selectedId, selectedName, x, y));
+                    document.getElementById(`check-sig-${selectedId}`).classList.remove('d-none');
+                    savePos('sig', selectedId, x, y, pageNum);
+                } else if (selectedType === 'qr') {
+                    document.querySelectorAll('.qr-marker').forEach(el => el.remove());
+                    overlay.appendChild(createQrMarker(x, y));
+                    document.getElementById('check-qr').classList.remove('d-none');
+                    savePos('qr', null, x, y, pageNum);
+                }
             });
         });
     }
 
-    function createMarkerHtml(userId, name, x, y) {
+function createSigMarker(id, name, x, y) {
         const div = document.createElement('div');
-        div.className = 'sig-marker shadow'; // We use .sig-marker for validation below
-        div.style.left = x + '%'; div.style.top = y + '%';
-        div.dataset.userId = userId;
-        div.innerHTML = `<button type="button" class="btn-delete-tag" onclick="deleteMarker(event, ${userId})"><i class="fa fa-times"></i></button>
-            <div class="text-center lh-1"><div style="font-size: 0.75rem; font-weight: 800;">SIGN HERE</div><div style="font-size: 0.6rem;">${name}</div></div>`;
+        // Ensure sig-marker is the FIRST class
+        div.className = 'sig-marker shadow'; 
+        div.style.left = x + '%'; 
+        div.style.top = y + '%';
+        div.dataset.id = id;
+        
+        // This ensures the element is physically "real" in the HTML
+        div.setAttribute('class', 'sig-marker shadow'); 
+        
+        div.innerHTML = `
+            <button type="button" class="btn-delete-tag" onclick="deleteTag(event, 'sig', ${id})">
+                <i class="fa fa-times"></i>
+            </button>
+            <div class="text-center lh-1">
+                <div style="font-size: 10px; font-weight: 800;">SIGN HERE</div>
+                <div style="font-size: 9px;">${name}</div>
+            </div>`;
         return div;
     }
 
-    // 3. Button Actions
+    function createQrMarker(x, y) {
+        const div = document.createElement('div');
+        div.className = 'qr-marker shadow';
+        div.style.left = x + '%'; div.style.top = y + '%';
+        div.innerHTML = `<button type="button" class="btn-delete-tag" onclick="deleteTag(event, 'qr', null)"><i class="fa fa-times"></i></button>
+            <i class="fa fa-qrcode fa-2x"></i><div style="font-size: 8px; font-weight: 800;">QR CODE</div>`;
+        return div;
+    }
+
     document.querySelectorAll('.signatory-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             document.querySelectorAll('.signatory-btn').forEach(b => b.classList.remove('active'));
             this.classList.add('active');
-            selectedUserId = this.dataset.userId;
+            selectedType = this.dataset.type;
+            selectedId = this.dataset.id;
+            selectedName = this.dataset.name || '';
         });
     });
 
-    function savePosition(userId, x, y, pageNum) {
-        fetch("{{ route('documents.saveTag') }}", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "X-CSRF-TOKEN": "{{ csrf_token() }}" },
-            body: JSON.stringify({ doc_id: "{{ $document->id }}", user_id: userId, x: x, y: y, page_num: pageNum })
-        });
-    }
+function savePos(type, id, x, y, page) {
+    // If type is 'qr', we hit a different route
+    const url = type === 'sig' ? "{{ route('documents.saveTag') }}" : "{{ route('documents.saveQrTag') }}";
+    
+    fetch(url, {
+        method: "POST",
+        headers: { 
+            "Content-Type": "application/json", 
+            "X-CSRF-TOKEN": "{{ csrf_token() }}" 
+        },
+        body: JSON.stringify({ 
+            doc_id: "{{ $document->id }}", 
+            signatory_id: id, // null for QR
+            x: x, 
+            y: y, 
+            page_num: page 
+        })
+    }).then(response => {
+        if (response.ok) {
+            if (type === 'sig') {
+                document.getElementById(`check-sig-${id}`).classList.remove('d-none');
+            } else {
+                document.getElementById('check-qr').classList.remove('d-none');
+            }
+        }
+    });
+}
 
-    window.deleteMarker = function(e, userId) {
-        e.stopPropagation();
-        e.target.closest('.sig-marker').remove();
-        document.getElementById(`check-${userId}`).classList.add('d-none');
-        fetch("{{ route('documents.deleteTag') }}", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "X-CSRF-TOKEN": "{{ csrf_token() }}" },
-            body: JSON.stringify({ doc_id: "{{ $document->id }}", user_id: userId })
-        });
-    };
-
-    // 4. Finalize & Cancel Logic
-    document.getElementById('btn-finalize').addEventListener('click', function() {
-        const tagsOnScreen = document.querySelectorAll('.sig-marker').length; 
+    // FINALIZING LOGIC
+    document.getElementById('btn-finalize').addEventListener('click', function(e) {
+        e.preventDefault();
         
-        if (tagsOnScreen === 0) {
-            Swal.fire({
+        // Count how many checkmarks are visible in the sidebar
+        const savedSignatures = document.querySelectorAll('#signatoryList .badge:not(.d-none)').length;
+        
+        if (savedSignatures === 0) {
+            return Swal.fire({
                 title: 'No Tags Placed!',
-                text: 'Please click on the document to place a signature tag before finalizing.',
+                text: 'You must select a name from the sidebar and click on the document to place their signature tag.',
                 icon: 'warning',
                 confirmButtonColor: '#800000'
             });
-        } else {
-            // Trigger the back-end finalize route to change status from 'mapping' to 'pending'
-            window.location.href = "{{ url('/document/finalize/' . $document->id) }}";
         }
-    });
 
-    window.cancelMapping = function(e) {
         Swal.fire({
-            title: 'GO BACK TO EDIT?',
-            text: "We will discard your current tag progress and return to the form.",
-            icon: 'warning',
+            title: 'Finalize Placement?',
+            text: "This will set the signature positions and move the document to the next phase.",
+            icon: 'question',
             showCancelButton: true,
-            confirmButtonColor: '#800000',
-            confirmButtonText: 'YES, GO BACK'
+            confirmButtonColor: '#198754',
+            confirmButtonText: 'Yes, Finalize'
         }).then((result) => {
             if (result.isConfirmed) {
-                window.location.href = "{{ url('/document/discard/' . $document->id) }}";
+                window.location.href = "{{ route('documents.finalize', $document->id) }}";
             }
         });
-    };
+    });
 </script>
 @endpush

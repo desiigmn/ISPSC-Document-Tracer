@@ -12,17 +12,15 @@ return new class extends Migration
 public function up(): void
 {
     Schema::table('documents', function (Blueprint $table) {
-        // ONLY add the column if it does not exist yet
-        if (!Schema::hasColumn('documents', 'priority')) {
-            $table->integer('priority')->nullable()->default(1);
-        }
+        // This makes the column optional in the database
+        $table->string('target_office_id')->nullable()->change();
     });
 }
 
 public function down(): void
 {
     Schema::table('documents', function (Blueprint $table) {
-        $table->dropColumn('priority');
+        $table->string('target_office_id')->nullable(false)->change();
     });
 }
 };

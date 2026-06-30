@@ -8,10 +8,12 @@ return new class extends Migration
 {
 public function up(): void
 {
-    Schema::table('users', function (Blueprint $table) {
-        // This adds the avatar column
-        $table->string('avatar')->nullable()->after('email');
-    });
+    // Only run if the column DOES NOT exist
+    if (!Schema::hasColumn('users', 'avatar')) {
+        Schema::table('users', function (Blueprint $table) {
+            $table->string('avatar')->nullable()->after('email');
+        });
+    }
 }
 
 public function down(): void

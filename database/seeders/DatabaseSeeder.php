@@ -16,10 +16,14 @@ class DatabaseSeeder extends Seeder
     public function run(): void
 {
     // Create the test user using 'username'
-    \App\Models\User::factory()->create([
-        'username' => 'Test User',
-        'email' => 'test@example.com',
-    ]);
+\App\Models\User::create([
+    'username' => 'Head of Records Office',
+    'email' => 'brainnnotfound404@gmail.com',
+    'password' => bcrypt('12345678'), // Set your password here
+    'role' => 'superadmin',
+    'office_id' => 'ISPSC-MC-REC-2026-4URQGK',
+    'email_verified_at' => now(),
+]);
 
     // NOW call the OfficeSeeder
     $this->call([

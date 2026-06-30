@@ -3,24 +3,31 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Signatory extends Model
 {
-    protected $fillable = ['document_id', 'user_id', 'sign_order', 'status', 'signature_data', 'signed_at', 'x_pos', 'y_pos', 'page_num'];
-
-    // ADD THIS SECTION:
-    protected $casts = [
-        'signed_at' => 'datetime', // This tells Laravel to turn the string into a Carbon object
+    protected $fillable = [
+        'document_id',
+        'office_id',
+        'user_id',
+        'sign_order',
+        'status',
+        'x_pos',    // <--- ADD THIS
+        'y_pos',    // <--- ADD THIS
+        'page_num', // <--- ADD THIS
+        'signature_data',
+        'signed_at'
     ];
+        // ADD THIS BLOCK
+        protected $casts = [
+            'signed_at' => 'datetime',
+        ];
 
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'user_id');
+    public function office() {
+        return $this->belongsTo(Office::class, 'office_id');
     }
 
-    public function document(): BelongsTo
-    {
-        return $this->belongsTo(Document::class, 'document_id');
+    public function user() {
+        return $this->belongsTo(User::class, 'user_id');
     }
 }

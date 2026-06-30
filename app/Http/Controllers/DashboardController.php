@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Storage;
 
 class DashboardController extends Controller
 {
-    public function index(Request $request) 
+    public function index(Request $request)
     {
         $user = Auth::user();
         
@@ -18,23 +18,22 @@ class DashboardController extends Controller
         $isRecordsOffice = str_contains($user->office_id ?? '', '-REC-');
         $isAdminOrRecords = ($user->role === 'superadmin' || $isRecordsOffice);
 
-        $query = Document::query()->with(['uploader', 'targetOffice', 'logs', 'signatories.user']);
+        // Start the query with necessary relationships
+        $query = Document::query()->with(['uploader', 'logs', 'signatories.office', 'signatories.user']);
 
-        // 2. UNIFIED ACCESS CONTROL
+        // 2. UNIFIED ACCESS CONTROL (OFFICE-BASED)
         if (!$isAdminOrRecords) {
             $query->where(function($q) use ($user) {
                 // Scenario A: I am the Creator
                 $q->where('uploader_id', $user->id)
 
-                // Scenario B: I am a Signatory (Hide if status is Mapping or Needs Review)
-                ->orWhere(function($sub) use ($user) {
-                    $sub->whereHas('signatories', function($sig) use ($user) {
-                        $sig->where('user_id', $user->id)
-                            ->whereRaw('sign_order <= documents.current_step');
-                    })->whereNotIn('status', ['mapping', 'needs_review']);
+                // Scenario B: Routing - My Office is in the chain 
+                // (Changed from user_id to office_id so all staff in the office can see it)
+                ->orWhereHas('signatories', function($sig) use ($user) {
+                    $sig->where('office_id', $user->office_id);
                 })
 
-                // Scenario C: Officially shared with my office
+                // Scenario C: Officially shared with my office via logs
                 ->orWhereHas('logs', function($sub) use ($user) {
                     $sub->where('office_id', $user->office_id)
                         ->where('action', 'DISSEMINATED');
@@ -42,17 +41,18 @@ class DashboardController extends Controller
             });
         }
 
-        // Clone before filtering/searching for accurate global counts
-        $baseQuery = clone $query;
+        // Clone before filtering/searching for accurate counts
+        $baseQueryForStats = clone $query;
 
         // 3. SEARCH & FILTERS
         if ($request->filled('search')) {
             $query->where(function($q) use ($request) {
                 $q->where('tracking_id', 'LIKE', '%' . $request->search . '%')
-                ->orWhere('title', 'LIKE', '%' . $request->search . '%');
+                  ->orWhere('title', 'LIKE', '%' . $request->search . '%');
             });
         }
 
+        // 4. TAB FILTERS
         if ($request->filter == 'review') {
             $query->where('status', 'needs_review');
         } elseif ($request->filter == 'pending') {
@@ -60,47 +60,47 @@ class DashboardController extends Controller
         } elseif ($request->filter == 'accepted') {
             $query->where('status', 'accepted');
         } elseif ($request->filter == 'shared') {
-            $query->whereHas('logs', function($q) use ($user, $isAdminOrRecords) {
-                $q->where('action', 'DISSEMINATED');
-                // If not admin, restrict to their specific office
-                if (!$isAdminOrRecords) {
-                    $q->where('office_id', $user->office_id);
-                }
+            $query->whereHas('logs', function($q) use ($user) {
+                $q->where('action', 'DISSEMINATED')->where('office_id', $user->office_id);
             });
         }
 
-
-        // 4. UNIFIED SEQUENTIAL SORTING
-        // Logic: Mapping/Review -> Priority 3 -> Priority 2 -> Priority 1 -> Accepted
+        // 5. EXECUTE QUERY WITH SORTING
         $documents = $query->orderByRaw("FIELD(status, 'mapping', 'needs_review', 'returned', 'pending') ASC")
                            ->orderBy('priority', 'desc')
                            ->orderBy('created_at', 'desc')
                            ->paginate(40)
                            ->appends($request->all());
 
-            // --- 5. CALCULATE COUNTS FOR CARDS ---
+        // 6. CALCULATE COUNTS FOR CARDS (BASED ON OFFICE)
+        
+        // A. For Review (Only for Admin/Records)
+        $countReview = (clone $baseQueryForStats)->where('status', 'needs_review')->count();
 
-            // 1. Count items needing priority (Unchanged)
-            $countReview = (clone $baseQuery)->where('status', 'needs_review')->count();
-
-            // 2. Count On Process items (Unchanged)
-            $countPending = (clone $baseQuery)->whereIn('status', ['mapping', 'pending', 'returned'])->count();
-
-            // 3. FIX: Count Shared Copies (Received Shares)
-            $countShared = (clone $baseQuery)->whereHas('logs', function($sub) use ($user) {
-                $sub->where('action', 'DISSEMINATED');
-                // If not admin, only count what was shared to THEIR office
-                if ($user->role !== 'superadmin' && !str_contains($user->office_id, '-REC-')) {
-                    $sub->where('office_id', $user->office_id);
-                }
-            })->count();
-
-            // 4. FIX: Count Completed/Finished (ONLY those NOT shared)
-            // We subtract the shared ones so the numbers match the table categories
-            $countFinished = (clone $baseQuery)->where('status', 'accepted')
-                ->whereDoesntHave('logs', function($sub) {
-                    $sub->where('action', 'DISSEMINATED');
+        // B. On Process (What is specifically at the USER'S office right now)
+        if ($isAdminOrRecords) {
+            $countPending = (clone $baseQueryForStats)->whereIn('status', ['mapping', 'pending', 'returned'])->count();
+        } else {
+            // For staff: Count documents where status is pending AND current step is THEIR office
+            $countPending = (clone $baseQueryForStats)->where('status', 'pending')
+                ->whereHas('signatories', function($q) use ($user) {
+                    $q->where('office_id', $user->office_id)
+                      ->whereColumn('sign_order', 'documents.current_step');
                 })->count();
+        }
+
+        // C. Shared Copies
+        $countShared = (clone $baseQueryForStats)->whereHas('logs', function($sub) use ($user) {
+            $sub->where('action', 'DISSEMINATED')->where('office_id', $user->office_id);
+        })->count();
+
+        // D. Finished/Accepted
+        $countFinished = (clone $baseQueryForStats)->where('status', 'accepted')->count();
+
+        // E. Returned (If user is the uploader and needs to fix something)
+        $countReturned = (clone $baseQueryForStats)->where('status', 'returned')
+                            ->where('uploader_id', $user->id)
+                            ->count();
 
         return view('dashboard', compact(
             'documents', 
@@ -108,38 +108,29 @@ class DashboardController extends Controller
             'countPending', 
             'countFinished', 
             'countShared', 
+            'countReturned',
             'isAdminOrRecords'
         ));
     }
+
     public function updateProfile(Request $request)
     {
-        // 1. Get the currently logged in user (whoever they are)
         $user = Auth::user();
-
-        // 2. Validate Input
         $request->validate([
             'username' => 'required|string|max:255',
-            'avatar'   => 'nullable|image|mimes:jpeg,png,jpg|max:2048', // 2MB Max
+            'avatar'   => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
-        // 3. Update the name
         $user->username = $request->username;
 
-        // 4. Handle Avatar Upload
         if ($request->hasFile('avatar')) {
-            // Delete old photo if it exists to save space
             if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
                 Storage::disk('public')->delete($user->avatar);
             }
-            
-            // Save new photo
-            $path = $request->file('avatar')->store('avatars', 'public');
-            $user->avatar = $path;
+            $user->avatar = $request->file('avatar')->store('avatars', 'public');
         }
 
-        // 5. Save everything to database
         $user->save();
-
         return back()->with('msg', 'Profile successfully updated!');
     }
 }

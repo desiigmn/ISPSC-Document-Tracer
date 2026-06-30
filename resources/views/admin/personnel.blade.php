@@ -34,7 +34,7 @@
     .ledger-row td { 
         padding: 18px 20px !important; 
         border-bottom: 1px solid #f1f1f1 !important; 
-        font-size: 14px; /* NORMAL INFO 14px */
+        font-size: 14px; 
         vertical-align: middle;
     }
 
@@ -64,15 +64,9 @@
 
 @section('content')
 @php
-    // Mapping campus codes to names for the table display
     $campusNames = [
-        '0001' => 'MAIN',
-        '0010' => 'CANDON',
-        '0011' => 'SANTIAGO',
-        '0100' => 'STA MARIA',
-        '0101' => 'TAGUDIN',
-        '0110' => 'NARVACAN',
-        '0111' => 'CERVANTES',
+        '0001' => 'MAIN', '0010' => 'CANDON', '0011' => 'SANTIAGO',
+        '0100' => 'STA MARIA', '0101' => 'TAGUDIN', '0110' => 'NARVACAN', '0111' => 'CERVANTES',
     ];
 @endphp
 
@@ -82,7 +76,7 @@
     <div class="row align-items-center mb-4 g-3">
         <div class="col-lg-8">
             <h4 class="fw-black mb-0">Personnel & Office Management</h4>
-            <small class="text-muted fw-bold">Institutional Structure & User Administration</small>
+            <small class="text-muted fw-bold">Restricted Registration Hub: <span class="text-maroon">@ispsc.edu.ph Only</span></small>
         </div>
         <div class="col-lg-4 d-flex justify-content-lg-end">
             <button class="btn btn-docu btn-maroon shadow-sm" data-bs-toggle="modal" data-bs-target="#registerStaffModal">
@@ -94,10 +88,9 @@
     <div class="row g-4">
         <!-- LEFT: OFFICE MANAGEMENT -->
         <div class="col-xl-4">
-            <!-- ADD OFFICE -->
             <div class="tracer-card">
                 <div class="tracer-card-header bg-maroon">
-                    <h6 class="text-dark mb-0">Create New Office </h6>
+                    <h6 class="text-white mb-0">Create New Office Hub</h6>
                 </div>
                 <div class="card-body p-4">
                     <form action="{{ route('admin.offices.store') }}" method="POST">
@@ -106,16 +99,13 @@
                             <label class="form-label fw-bold small text-muted text-uppercase mb-2">Institutional Name</label>
                             <input type="text" name="office_name" class="form-control" placeholder="e.g. Registrar's Office" required>
                         </div>
-                        <button class="btn btn-docu btn-dark w-100 py-2">SAVE OFFICE</button>
+                        <button class="btn btn-docu btn-dark w-100 py-2">SAVE OFFICE HUB</button>
                     </form>
                 </div>
             </div>
 
-            <!-- OFFICE LIST -->
             <div class="tracer-card">
-                <div class="tracer-card-header">
-                    <h6>Registry of Offices</h6>
-                </div>
+                <div class="tracer-card-header"><h6>Registry of Offices</h6></div>
                 <div class="p-3 border-bottom bg-light">
                     <div class="header-search-container">
                         <i class="fa fa-search header-search-icon"></i>
@@ -125,10 +115,7 @@
                 <div class="office-table-container">
                     <table class="table table-hover align-middle mb-0" id="officeTable">
                         <thead>
-                            <tr>
-                                <th class="ps-4">OFFICE NAME</th>
-                                <th class="text-end pe-4">ACTION</th>
-                            </tr>
+                            <tr><th class="ps-4">OFFICE NAME</th><th class="text-end pe-4">ACTION</th></tr>
                         </thead>
                         <tbody>
                             @foreach($offices as $office)
@@ -146,9 +133,6 @@
                                 </td>
                             </tr>
                             @endforeach
-                            <tr id="noResults" style="display: none;">
-                                <td colspan="2" class="text-center py-5 text-muted fw-bold">No matching hub found.</td>
-                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -158,47 +142,33 @@
         <!-- RIGHT: PERSONNEL LIST -->
         <div class="col-xl-8">
             <div class="tracer-card">
-                <div class="tracer-card-header">
-                    <h6>Registered Institutional Personnel</h6>
-                </div>
+                <div class="tracer-card-header"><h6>Registered Institutional Personnel</h6></div>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead>
                             <tr>
-                                <th class="ps-4">PERSONNEL / ACCOUNT EMAIL</th>
-                                <th>OFFICE</th>
+                                <th class="ps-4">PERSONNEL</th>
+                                <th>OFFICE HUB</th>
                                 <th>CAMPUS</th>
                                 <th class="text-end pe-4">ACTIONS</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {{-- Sorting by campus_code ensures 0001 (Main) comes first, then 0010, 0011, etc. --}}
                             @foreach($allUsers->sortBy('campus_code') as $u)
                             <tr class="ledger-row">
                                 <td class="ps-4">
                                     <div class="fw-bold text-dark">{{ $u->username }}</div>
                                     <small class="text-muted fw-bold">{{ $u->email }}</small>
                                 </td>
-                                <td>
-                                    <span class="small fw-bold text-muted">{{ $u->office->office_name ?? 'NOT ASSIGNED' }}</span>
-                                </td>
-                                <td>
-                                    <span class="badge bg-light text-dark border fw-bold" style="font-size: 11px;">
-                                        {{ $campusNames[$u->campus_code] ?? 'N/A' }}
-                                    </span>
-                                </td>
+                                <td><span class="small fw-bold text-muted">{{ $u->office->office_name ?? 'NOT ASSIGNED' }}</span></td>
+                                <td><span class="badge bg-light text-dark border fw-bold" style="font-size: 11px;">{{ $campusNames[$u->campus_code] ?? 'N/A' }}</span></td>
                                 <td class="text-end pe-4">
                                     <div class="d-flex justify-content-end gap-2">
-                                        <button class="btn btn-sm btn-outline-maroon px-3 py-1" onclick="openResetModal('{{ $u->id }}', '{{ $u->username }}')" title="Reset Security Code">
-                                            <i class="fa fa-key"></i>
-                                        </button>
-
+                                        <button class="btn btn-sm btn-outline-maroon px-3 py-1" onclick="openResetModal('{{ $u->id }}', '{{ $u->username }}')"><i class="fa fa-key"></i></button>
                                         @if($u->id !== Auth::id())
-                                            <form action="{{ route('admin.staff.destroy', $u->id) }}" method="POST" onsubmit="return confirm('Remove personnel from registry?')">
+                                            <form action="{{ route('admin.staff.destroy', $u->id) }}" method="POST" onsubmit="return confirm('Remove?')">
                                                 @csrf @method('DELETE')
-                                                <button type="submit" class="btn btn-sm btn-outline-danger px-3 py-1">
-                                                    <i class="fa fa-trash-alt"></i>
-                                                </button>
+                                                <button type="submit" class="btn btn-sm btn-outline-danger px-3 py-1"><i class="fa fa-trash-alt"></i></button>
                                             </form>
                                         @endif
                                     </div>
@@ -212,70 +182,47 @@
         </div>
     </div>
 </div>
-
-<!-- MODAL: REGISTER STAFF -->
+<!-- MODAL: REGISTER STAFF (With Email Filtering Logic) -->
 <div class="modal fade" id="registerStaffModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-maroon">
-                <h5 class="modal-title fw-bold text-white">REGISTER NEW STAFF</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            <div class="modal-header bg-maroon p-4">
+                <h6 class="modal-title fw-black text-dark text-uppercase">New Staff Registration</h6>
+                <button type="button" class="btn-close btn-close-dark" data-bs-dismiss="modal"></button>
             </div>
             <form action="{{ route('admin.staff.store') }}" method="POST">
                 @csrf
-                <div class="modal-body">
+                <div class="modal-body p-4">
                     <div class="mb-3">
-                        <label class="small fw-bold text-muted">FULL NAME</label>
+                        <label class="form-label">Full Name</label>
                         <input type="text" name="full_name" class="form-control" placeholder="e.g. Juan Dela Cruz" required>
                     </div>
                     <div class="mb-3">
-                        <label class="small fw-bold text-muted">EMAIL ADDRESS</label>
-                        <input type="email" name="email" class="form-control" placeholder="e.g. juan@example.com" required>
+                        <label class="form-label">Institutional Email (@ispsc.edu.ph)</label>
+                        {{-- HTML5 Pattern Fix for Email Domain Filtering --}}
+                        <input type="email" name="email" class="form-control border-primary" 
+                               placeholder="username@ispsc.edu.ph" 
+                               pattern=".+@ispsc\.edu\.ph" 
+                               title="Registration is restricted to official ISPSC accounts (@ispsc.edu.ph)."
+                               required>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="small fw-bold text-muted">OFFICE</label>
-                            <select name="office_id" class="form-select" required>
-                                <option value="" selected disabled>Select...</option>
-                                @foreach($offices as $office)
-                                    <option value="{{ $office->id }}">{{ $office->office_name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="small fw-bold text-muted">CAMPUS</label>
-                            <select name="campus_code" class="form-select" required>
-                                <option value="0001">MAIN (0001)</option>
-                                <option value="0010">CANDON (0010)</option>
-                                <option value="0011">SANTIAGO (0011)</option>
-                                <option value="0100">STA MARIA (0100)</option>  
-                                <option value="0101">TAGUDIN (0101)</option>
-                                <option value="0110">NARVACAN (0110)</option>
-                                <option value="0111">CERVANTES (0111)</option>
-                            </select>
-                        </div>
+                    <div class="row g-3">
+                        <div class="col-md-6 mb-3"><label class="form-label">Office</label><select name="office_id" class="form-select" required><option value="" selected disabled>Select Hub...</option>@foreach($offices as $office)<option value="{{ $office->id }}">{{ $office->office_name }}</option>@endforeach</select></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Campus</label><select name="campus_code" class="form-select" required><option value="0001">MAIN</option><option value="0010">CANDON</option><option value="0011">SANTIAGO</option><option value="0100">STA MARIA</option><option value="0101">TAGUDIN</option><option value="0110">NARVACAN</option><option value="0111">CERVANTES</option></select></div>
                     </div>
                     <div class="mb-3">
-                        <label class="small fw-bold text-maroon text-uppercase">Account Role</label>
-                        <select name="role" class="form-select border-maroon" required>
-                            <option value="staff" selected>STAFF (REGULAR USER)</option>
-                            <option value="superadmin">SUPER ADMIN (RECORDS HEAD)</option>
+                        <label class="form-label">Account Role</label>
+                        <select name="role" class="form-select" required>
+                            <option value="staff" selected>Regular Staff Member</option>
+                            <option value="superadmin">Super Admin (Records Head)</option>
                         </select>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="small fw-bold text-muted">PASSWORD</label>
-                            <input type="password" name="password" class="form-control" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="small fw-bold text-muted">CONFIRM</label>
-                            <input type="password" name="password_confirmation" class="form-control" required>
-                        </div>
+                    <div class="row g-3">
+                        <div class="col-md-6 mb-3"><label class="form-label">Password</label><input type="password" name="password" class="form-control" required></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Confirm</label><input type="password" name="password_confirmation" class="form-control" required></div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="submit" class="btn btn-maroon w-100 fw-bold py-2">CREATE ACCOUNT</button>
-                </div>
+                <div class="p-4 pt-0"><button type="submit" class="btn btn-docu btn-maroon w-100 py-3">CREATE ACCOUNT</button></div>
             </form>
         </div>
     </div>
@@ -313,6 +260,7 @@
 @endsection
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     // OFFICE SEARCH LOGIC
     document.getElementById('officeSearch').addEventListener('keyup', function() {
@@ -334,6 +282,7 @@
     function openResetModal(userId, userName) {
         document.getElementById('resetTargetName').innerText = userName;
         document.getElementById('resetPasswordForm').action = `/admin/staff/reset-password/${userId}`;
+        // This line will work now!
         new bootstrap.Modal(document.getElementById('resetPasswordModal')).show();
     }
 </script>

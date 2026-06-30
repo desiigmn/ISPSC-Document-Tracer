@@ -9,19 +9,20 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-public function up()
-{
-    Schema::table('documents', function (Blueprint $table) {
-        $table->integer('priority')->default(1); // 1: Not Urgent, 2: Urgent, 3: Extremely Urgent
-    });
-}
+    public function up(): void
+    {
+        Schema::table('signatories', function (Blueprint $table) {
+            // 0 = In Transit (Not yet received), 1 = Physically Received
+            $table->boolean('is_physically_received')->default(0);
+        });
+    }
 
     /**
      * Reverse the migrations.
      */
     public function down(): void
     {
-        Schema::table('documents', function (Blueprint $table) {
+        Schema::table('signatories', function (Blueprint $table) {
             //
         });
     }

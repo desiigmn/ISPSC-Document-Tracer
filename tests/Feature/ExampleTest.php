@@ -10,10 +10,11 @@ class ExampleTest extends TestCase
     /**
      * A basic test example.
      */
-    public function test_the_application_returns_a_successful_response(): void
-    {
-        $response = $this->get('/');
+public function test_the_application_returns_a_successful_response(): void
+{
+    $response = $this->get('/');
 
-        $response->assertStatus(200);
-    }
+    // Since you have middleware 'auth', it will redirect to /login
+    $response->assertStatus(302); 
+}
 }

@@ -18,8 +18,11 @@ class Document extends Model
         'current_office_id',
         'target_office_id',
         'file_path',
-        'current_step'
-    ];
+        'current_step',
+        'qr_x',    // Add this
+        'qr_y',    // Add this
+        'qr_page', // Add this
+];
 
     protected $casts = [
     'is_hard_copy' => 'boolean', // This forces 1 to become true and 0 to become false
@@ -78,5 +81,19 @@ class Document extends Model
     // This connects target_office_id to the Office model
     return $this->belongsTo(Office::class, 'target_office_id');
 }
+public function currentHolder()
+{
+    // Find the signatory record that matches the current step
+    $step = $this->signatories->where('sign_order', $this->current_step)->first();
+    
+    if ($this->status == 'accepted') {
+        return 'Completed / Archived';
+    }
 
+    if ($this->status == 'returned') {
+        return 'Uploader (For Correction)';
+    }
+
+    return $step->office->office_name ?? 'Records Office';
+}
 }
